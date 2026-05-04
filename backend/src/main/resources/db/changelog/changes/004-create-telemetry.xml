@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- 1. Table telemetry standard (avant conversion en hypertable) -->
+    <changeSet id="004-create-telemetry" author="smarthome">
+        <createTable tableName="telemetry">
+            <column name="time" type="TIMESTAMPTZ">
+                <constraints nullable="false"/>
+            </column>
+            <column name="device_id" type="UUID">
+                <constraints nullable="false"
+                             foreignKeyName="fk_telemetry_device"
+                             references="devices(id)"
+                             deleteCascade="true"/>
+            </column>
+            <column name="metric" type="VARCHAR(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="value" type="DOUBLE PRECISION">
+                <constraints nullable="false"/>
+            </column>
+            <column name="unit" type="VARCHAR(20)"/>
+            <column name="quality" type="SMALLINT" defaultValueNumeric="100"/>
+        </createTable>
+    </changeSet>
+
+    <!-- 2. Conversion en hypertable TimescaleDB (doit se faire après CREATE TABLE) -->
+    <changeSet id="004-create-telemetry-hypertable" author="smarthome">
+        <sql>SELECT create_hypertable('telemetry', 'time', if_not_exists => TRUE);</sql>
+    </changeSet>
+
+    <!-- 3. Index pour les requêtes par appareil + temps -->
+    <changeSet id="004-create-telemetry-index" author="smarthome">
+        <sql>CREATE INDEX IF NOT EXISTS idx_telemetry_device_time ON telemetry (device_id, time DESC);</sql>
+        <sql>CREATE INDEX IF NOT EXISTS idx_telemetry_metric ON telemetry (metric, time DESC);</sql>
+    </changeSet>
+
+    <!-- 4. Vue matérialisée TimescaleDB pour les agrégats horaires -->
+    <changeSet id="004-create-telemetry-hourly-view" author="smarthome">
+        <sql>
+            CREATE MATERIALIZED VIEW IF NOT EXISTS telemetry_hourly
+            WITH (timescaledb.continuous) AS
+            SELECT
+                time_bucket('1 hour', time) AS bucket,
+                device_id,
+                metric,
+                AVG(value)   AS avg_value,
+                MIN(value)   AS min_value,
+                MAX(value)   AS max_value,
+                COUNT(*)     AS sample_count
+            FROM telemetry
+            GROUP BY bucket, device_id, metric;
+        </sql>
+    </changeSet>
+
+    <!-- 5. Politique de rafraîchissement automatique de la vue (lag de 1h, avance de 1 bucket) -->
+    <changeSet id="004-add-telemetry-hourly-refresh-policy" author="smarthome">
+        <sql>
+            SELECT add_continuous_aggregate_policy(
+                'telemetry_hourly',
+                start_offset => INTERVAL '3 hours',
+                end_offset   => INTERVAL '1 hour',
+                schedule_interval => INTERVAL '1 hour',
+                if_not_exists => TRUE
+            );
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="005-create-device-commands" author="smarthome">
+        <createTable tableName="device_commands">
+            <column name="id" type="UUID" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="device_id" type="UUID">
+                <constraints nullable="false"
+                             foreignKeyName="fk_commands_device"
+                             references="devices(id)"
+                             deleteCascade="true"/>
+            </column>
+            <column name="user_id" type="UUID">
+                <constraints nullable="false"
+                             foreignKeyName="fk_commands_user"
+                             references="users(id)"/>
+            </column>
+            <column name="command" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+            <!-- payload: { "value": 21.5 } -->
+            <column name="payload" type="JSONB"/>
+            <column name="status" type="VARCHAR(20)" defaultValue="SENT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="sent_at" type="TIMESTAMPTZ" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="ack_at" type="TIMESTAMPTZ"/>
+        </createTable>
+
+        <createIndex tableName="device_commands" indexName="idx_commands_device_id">
+            <column name="device_id"/>
+        </createIndex>
+        <createIndex tableName="device_commands" indexName="idx_commands_sent_at">
+            <column name="sent_at" descending="true"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>
