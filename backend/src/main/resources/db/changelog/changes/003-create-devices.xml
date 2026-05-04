@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="003-create-devices" author="smarthome">
+        <createTable tableName="devices">
+            <column name="id" type="UUID" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="user_id" type="UUID">
+                <constraints nullable="false"
+                             foreignKeyName="fk_devices_user"
+                             references="users(id)"
+                             deleteCascade="true"/>
+            </column>
+            <column name="device_type_id" type="UUID">
+                <constraints nullable="false"
+                             foreignKeyName="fk_devices_device_type"
+                             references="device_types(id)"/>
+            </column>
+            <column name="name" type="VARCHAR(150)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="location" type="VARCHAR(100)"/>
+            <column name="mqtt_client_id" type="VARCHAR(150)">
+                <constraints unique="true"/>
+            </column>
+            <column name="status" type="VARCHAR(20)" defaultValue="OFFLINE">
+                <constraints nullable="false"/>
+            </column>
+            <!-- config: configuration spécifique à l'appareil -->
+            <column name="config" type="JSONB"/>
+            <column name="last_seen_at" type="TIMESTAMPTZ"/>
+            <column name="created_at" type="TIMESTAMPTZ" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="TIMESTAMPTZ" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <createIndex tableName="devices" indexName="idx_devices_user_id">
+            <column name="user_id"/>
+        </createIndex>
+        <createIndex tableName="devices" indexName="idx_devices_status">
+            <column name="status"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

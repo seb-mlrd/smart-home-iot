@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="002-create-device-types" author="smarthome">
+        <createTable tableName="device_types">
+            <column name="id" type="UUID" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="name" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="manufacturer" type="VARCHAR(100)"/>
+            <column name="protocol" type="VARCHAR(50)"/>
+            <!-- capabilities: { "telemetry": ["temperature","humidity"], "commands": ["set_temp"] } -->
+            <column name="capabilities" type="JSONB"/>
+            <column name="icon" type="VARCHAR(100)"/>
+            <column name="created_at" type="TIMESTAMPTZ" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="002-seed-device-types" author="smarthome">
+        <insert tableName="device_types">
+            <column name="id" value="11111111-0000-0000-0000-000000000001"/>
+            <column name="name" value="Thermostat"/>
+            <column name="manufacturer" value="Generic"/>
+            <column name="protocol" value="MQTT"/>
+            <column name="capabilities" value='{"telemetry":["temperature","humidity","target_temperature","heating_active"],"commands":["set_temperature"]}'/>
+            <column name="icon" value="thermostat"/>
+        </insert>
+        <insert tableName="device_types">
+            <column name="id" value="11111111-0000-0000-0000-000000000002"/>
+            <column name="name" value="Capteur qualité d&apos;air"/>
+            <column name="manufacturer" value="Generic"/>
+            <column name="protocol" value="MQTT"/>
+            <column name="capabilities" value='{"telemetry":["co2_ppm","pm25","temperature","humidity","air_quality_index"],"commands":[]}'/>
+            <column name="icon" value="air"/>
+        </insert>
+        <insert tableName="device_types">
+            <column name="id" value="11111111-0000-0000-0000-000000000003"/>
+            <column name="name" value="Prise connectée"/>
+            <column name="manufacturer" value="Generic"/>
+            <column name="protocol" value="MQTT"/>
+            <column name="capabilities" value='{"telemetry":["power_w","voltage_v","current_a","energy_kwh_total","is_on"],"commands":["toggle","set_state"]}'/>
+            <column name="icon" value="power"/>
+        </insert>
+        <insert tableName="device_types">
+            <column name="id" value="11111111-0000-0000-0000-000000000004"/>
+            <column name="name" value="Détecteur de mouvement"/>
+            <column name="manufacturer" value="Generic"/>
+            <column name="protocol" value="MQTT"/>
+            <column name="capabilities" value='{"telemetry":["motion_detected","door_open","battery_level"],"commands":[]}'/>
+            <column name="icon" value="sensor_occupied"/>
+        </insert>
+    </changeSet>
+
+</databaseChangeLog>
