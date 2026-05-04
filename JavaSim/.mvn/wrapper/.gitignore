@@ -1,0 +1,5 @@
+# Maven Wrapper downloaded files
+/dists/
+/maven-wrapper.jar
+*.jar.md5
+*.jar.sha1
