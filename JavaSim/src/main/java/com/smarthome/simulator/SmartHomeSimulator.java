@@ -16,7 +16,9 @@ import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5Publish;
 
 public class SmartHomeSimulator {
 
-    private static final String DEFAULT_BROKER_HOST = "broker.hivemq.com";
+    private static final String DEFAULT_BROKER_HOST = "4108a3db64d742a5963319148924c7fd.s1.eu.hivemq.cloud";
+    private static final String DEFAULT_BROKER_USERNAME = "Soblito";
+    private static final String DEFAULT_BROKER_PASSWORD = "j'41m3HiveMQ";
 
     private static final String TOPIC_TEMP = "smarthome/salon/temp";
     private static final String TOPIC_LUX = "smarthome/salon/lux";
@@ -269,7 +271,12 @@ public class SmartHomeSimulator {
                 .useMqttVersion5()
                 .identifier(clientId)
                 .serverHost(host)
-                .serverPort(1883)
+                .serverPort(8883)
+                .sslWithDefaultConfig()
+                .simpleAuth()
+                .username(DEFAULT_BROKER_USERNAME)
+                .password(DEFAULT_BROKER_PASSWORD.getBytes(StandardCharsets.UTF_8))
+                .applySimpleAuth()
                 .buildBlocking();
     }
 
