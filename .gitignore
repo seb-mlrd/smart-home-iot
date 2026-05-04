@@ -1,0 +1,46 @@
+# Java / Maven
+backend/target/
+*.class
+*.jar
+*.war
+*.ear
+
+# Spring Boot config local
+backend/src/main/resources/application-local.yml
+
+# Angular / Node
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+
+# Python simulators
+simulators/__pycache__/
+simulators/*.pyc
+simulators/.venv/
+simulators/venv/
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets / env
+.env
+.env.local
+*.env
+
+# Docker volumes
+docker/volumes/
+
+# Logs
+*.log
+
+# claude
+PLAN_CONCEPTION_SMARTHOME.md
+.claude

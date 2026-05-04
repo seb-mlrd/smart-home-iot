@@ -1,0 +1,53 @@
+version: "3.8"
+
+services:
+  hivemq:
+    image: hivemq/hivemq-ce:latest
+    container_name: smarthome-hivemq
+    ports:
+      - "1883:1883"   # MQTT
+      - "8080:8080"   # Console web
+    volumes:
+      - ./hivemq/config:/opt/hivemq/conf
+    networks:
+      - smarthome-net
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    container_name: smarthome-timescaledb
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: smarthome
+      POSTGRES_USER: smarthome
+      POSTGRES_PASSWORD: smarthome
+    volumes:
+      - timescaledb-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smarthome -d smarthome"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - smarthome-net
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: smarthome-pgadmin
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@smarthome.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    networks:
+      - smarthome-net
+
+volumes:
+  timescaledb-data:
+
+networks:
+  smarthome-net:
+    driver: bridge
