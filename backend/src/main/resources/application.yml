@@ -19,19 +19,20 @@ spring:
 
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.xml
-    enabled: true
+    enabled: false
 
 server:
   port: 8081
 
 mqtt:
-  broker-url: tcp://${MQTT_HOST:localhost}:${MQTT_PORT:1883}
-  client-id: smarthome-backend
+  host: ${MQTT_HOST:localhost}
+  port: ${MQTT_PORT:8883}
+  client-id: ${MQTT_CLIENT_ID:smarthome-backend}
   username: ${MQTT_USER:}
   password: ${MQTT_PASSWORD:}
   topic:
-    telemetry-wildcard: "home/+/device/+/telemetry"
-    status-wildcard: "home/+/device/+/status"
+    telemetry-wildcard: "smarthome/+/+"
+    status-wildcard: "smarthome/+/status"
 
 jwt:
   secret: ${JWT_SECRET:change-me-in-production-must-be-at-least-256-bits-long}
