@@ -16,6 +16,7 @@ import com.hivemq.client.mqtt.MqttClient;
 import com.hivemq.client.mqtt.mqtt5.Mqtt5AsyncClient;
 import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5Publish;
 import com.smarthome.backend.device.DeviceService;
+import com.smarthome.backend.telemetry.TelemetryService;
 
 import jakarta.annotation.PreDestroy;
 
@@ -26,13 +27,16 @@ public class MqttService {
 
     private final MqttProperties mqttProperties;
     private final DeviceService deviceService;
+    private final TelemetryService telemetryService;
     private final AtomicBoolean started = new AtomicBoolean(false);
 
     private volatile Mqtt5AsyncClient client;
 
-    public MqttService(MqttProperties mqttProperties, DeviceService deviceService) {
+    public MqttService(MqttProperties mqttProperties, DeviceService deviceService,
+                       TelemetryService telemetryService) {
         this.mqttProperties = mqttProperties;
         this.deviceService = deviceService;
+        this.telemetryService = telemetryService;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -112,8 +116,11 @@ public class MqttService {
     private void handleTelemetryMessage(Mqtt5Publish publish) {
         String topic = publish.getTopic().toString();
         String payload = extractPayload(publish);
-        log.info("MQTT telemetry on {}: {}", topic, payload);
-        parseDeviceId(topic, 3).ifPresent(deviceService::updateDeviceOnline);
+        log.debug("MQTT telemetry on {}: {}", topic, payload);
+        parseDeviceId(topic, 3).ifPresent(deviceId -> {
+            deviceService.updateDeviceOnline(deviceId);
+            telemetryService.ingest(deviceId, payload);
+        });
     }
 
     // topic: home/{userId}/device/{deviceId}/status → deviceId at index 3
