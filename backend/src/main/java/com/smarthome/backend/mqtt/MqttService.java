@@ -1,6 +1,8 @@
 package com.smarthome.backend.mqtt;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -13,6 +15,7 @@ import org.springframework.stereotype.Service;
 import com.hivemq.client.mqtt.MqttClient;
 import com.hivemq.client.mqtt.mqtt5.Mqtt5AsyncClient;
 import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5Publish;
+import com.smarthome.backend.device.DeviceService;
 
 import jakarta.annotation.PreDestroy;
 
@@ -22,12 +25,14 @@ public class MqttService {
     private static final Logger log = LoggerFactory.getLogger(MqttService.class);
 
     private final MqttProperties mqttProperties;
+    private final DeviceService deviceService;
     private final AtomicBoolean started = new AtomicBoolean(false);
 
     private volatile Mqtt5AsyncClient client;
 
-    public MqttService(MqttProperties mqttProperties) {
+    public MqttService(MqttProperties mqttProperties, DeviceService deviceService) {
         this.mqttProperties = mqttProperties;
+        this.deviceService = deviceService;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -80,10 +85,15 @@ public class MqttService {
                 .thenRun(() -> log.debug("Published on {}", topic));
     }
 
+    public CompletableFuture<Void> publishCommand(UUID userId, UUID deviceId, String payload) {
+        String topic = String.format("home/%s/device/%s/command", userId, deviceId);
+        return publish(topic, payload);
+    }
+
     private CompletableFuture<Void> subscribeToTelemetry() {
         return client.subscribeWith()
                 .topicFilter(mqttProperties.topic().telemetryWildcard())
-                .callback(this::logReceivedMessage)
+                .callback(this::handleTelemetryMessage)
                 .send()
                 .thenAccept(subAck -> log.info("Subscribed to {}", mqttProperties.topic().telemetryWildcard()))
                 .thenApply(ignored -> null);
@@ -92,18 +102,50 @@ public class MqttService {
     private CompletableFuture<Void> subscribeToStatus() {
         return client.subscribeWith()
                 .topicFilter(mqttProperties.topic().statusWildcard())
-                .callback(this::logReceivedMessage)
+                .callback(this::handleStatusMessage)
                 .send()
                 .thenAccept(subAck -> log.info("Subscribed to {}", mqttProperties.topic().statusWildcard()))
                 .thenApply(ignored -> null);
     }
 
-    private void logReceivedMessage(Mqtt5Publish publish) {
-        String payload = publish.getPayload()
+    // topic: home/{userId}/device/{deviceId}/telemetry → deviceId at index 3
+    private void handleTelemetryMessage(Mqtt5Publish publish) {
+        String topic = publish.getTopic().toString();
+        String payload = extractPayload(publish);
+        log.info("MQTT telemetry on {}: {}", topic, payload);
+        parseDeviceId(topic, 3).ifPresent(deviceService::updateDeviceOnline);
+    }
+
+    // topic: home/{userId}/device/{deviceId}/status → deviceId at index 3
+    private void handleStatusMessage(Mqtt5Publish publish) {
+        String topic = publish.getTopic().toString();
+        String payload = extractPayload(publish);
+        log.info("MQTT status on {}: {}", topic, payload);
+        parseDeviceId(topic, 3).ifPresent(deviceId -> {
+            if ("OFFLINE".equalsIgnoreCase(payload.trim())) {
+                deviceService.updateDeviceOffline(deviceId);
+            } else {
+                deviceService.updateDeviceOnline(deviceId);
+            }
+        });
+    }
+
+    private String extractPayload(Mqtt5Publish publish) {
+        return publish.getPayload()
                 .map(bytes -> StandardCharsets.UTF_8.decode(bytes).toString())
                 .orElse("");
+    }
 
-        log.info("MQTT message received on {}: {}", publish.getTopic(), payload);
+    private Optional<UUID> parseDeviceId(String topic, int index) {
+        String[] parts = topic.split("/");
+        if (parts.length > index) {
+            try {
+                return Optional.of(UUID.fromString(parts[index]));
+            } catch (IllegalArgumentException e) {
+                log.warn("Could not parse deviceId from topic segment '{}' in '{}'", parts[index], topic);
+            }
+        }
+        return Optional.empty();
     }
 
     private boolean hasCredentials() {

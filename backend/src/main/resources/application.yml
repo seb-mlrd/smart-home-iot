@@ -31,8 +31,8 @@ mqtt:
   username: ${MQTT_USER:}
   password: ${MQTT_PASSWORD:}
   topic:
-    telemetry-wildcard: "smarthome/+/+"
-    status-wildcard: "smarthome/+/status"
+    telemetry-wildcard: "home/+/device/+/telemetry"
+    status-wildcard: "home/+/device/+/status"
 
 jwt:
   secret: ${JWT_SECRET:change-me-in-production-must-be-at-least-256-bits-long}
