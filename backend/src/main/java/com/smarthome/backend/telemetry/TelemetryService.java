@@ -2,6 +2,7 @@ package com.smarthome.backend.telemetry;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smarthome.backend.device.DeviceService;
+import com.smarthome.backend.domain.device.DeviceRepository;
 import com.smarthome.backend.mqtt.dto.TelemetryPayload;
 import com.smarthome.backend.telemetry.dto.TelemetryHistoryPoint;
 import com.smarthome.backend.telemetry.dto.TelemetryPointResponse;
@@ -9,6 +10,7 @@ import com.smarthome.backend.telemetry.dto.TelemetryStatsResponse;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -34,6 +36,8 @@ public class TelemetryService {
 
     private final TelemetryJdbcRepository telemetryRepo;
     private final DeviceService deviceService;
+    private final DeviceRepository deviceRepository;
+    private final SimpMessagingTemplate messagingTemplate;
     private final ObjectMapper objectMapper;
 
     public void ingest(UUID deviceId, String jsonPayload) {
@@ -44,6 +48,7 @@ public class TelemetryService {
             }
             OffsetDateTime time = payload.timestamp() != null ? payload.timestamp() : OffsetDateTime.now();
             telemetryRepo.insertBatch(deviceId, payload.metrics(), time);
+            broadcastTelemetry(deviceId, payload.metrics(), time);
         } catch (Exception e) {
             log.warn("Could not parse telemetry payload for device {}: {}", deviceId, e.getMessage());
         }
@@ -70,5 +75,19 @@ public class TelemetryService {
         OffsetDateTime from = to.minus(duration);
         return telemetryRepo.findStats(deviceId, metric, from, to)
                 .orElse(new TelemetryStatsResponse(metric, null, null, null, null, 0, from, to));
+    }
+
+    private void broadcastTelemetry(UUID deviceId, List<com.smarthome.backend.mqtt.dto.MetricItem> metrics, OffsetDateTime time) {
+        deviceRepository.findById(deviceId).ifPresent(device -> {
+            UUID userId = device.getUser().getId();
+            List<TelemetryPointResponse> points = metrics.stream()
+                    .filter(m -> m.name() != null && m.value() != null)
+                    .map(m -> new TelemetryPointResponse(m.name(), m.value(), m.unit(), time))
+                    .toList();
+            messagingTemplate.convertAndSend(
+                    "/topic/devices/" + userId + "/" + deviceId + "/telemetry",
+                    points
+            );
+        });
     }
 }
