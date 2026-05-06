@@ -10,6 +10,7 @@ import { MatOption } from '@angular/material/core';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { DeviceService } from '../../../core/services/device.service';
 import { Device } from '../../../core/models/device.model';
+import { DeviceStatusBadgeComponent } from '../../../shared/components/device-status-badge/device-status-badge.component';
 
 @Component({
   selector: 'app-device-list',
@@ -17,6 +18,7 @@ import { Device } from '../../../core/models/device.model';
   imports: [
     RouterLink, FormsModule,
     MatButton, MatAnchor, MatIcon, MatFormField, MatLabel, MatInput, MatSelect, MatOption, MatProgressSpinner,
+    DeviceStatusBadgeComponent,
   ],
   styles: [`
     .page-header {
@@ -185,9 +187,7 @@ import { Device } from '../../../core/models/device.model';
               <div class="device-icon-wrap">
                 <mat-icon>{{ getDeviceIcon(device.deviceTypeName) }}</mat-icon>
               </div>
-              <span class="status-badge" [class]="device.status.toLowerCase()">
-                {{ device.status }}
-              </span>
+              <app-device-status-badge [status]="device.status" />
             </div>
 
             <div class="card-body">
