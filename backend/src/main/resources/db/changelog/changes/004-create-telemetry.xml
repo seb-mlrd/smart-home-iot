@@ -40,7 +40,7 @@
     </changeSet>
 
     <!-- 4. Vue matérialisée TimescaleDB pour les agrégats horaires -->
-    <changeSet id="004-create-telemetry-hourly-view" author="smarthome">
+    <changeSet id="004-create-telemetry-hourly-view" author="smarthome" runInTransaction="false">
         <sql>
             CREATE MATERIALIZED VIEW IF NOT EXISTS telemetry_hourly
             WITH (timescaledb.continuous) AS
