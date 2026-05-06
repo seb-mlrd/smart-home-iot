@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="006-seed-missing-device-types" author="smarthome">
+        <insert tableName="device_types">
+            <column name="id" value="11111111-0000-0000-0000-000000000005"/>
+            <column name="name" value="Capteur de température"/>
+            <column name="manufacturer" value="Generic"/>
+            <column name="protocol" value="MQTT"/>
+            <column name="capabilities" value='{"telemetry":["temperature","unit"],"commands":[]}'/>
+            <column name="icon" value="thermostat"/>
+        </insert>
+        <insert tableName="device_types">
+            <column name="id" value="11111111-0000-0000-0000-000000000006"/>
+            <column name="name" value="Capteur de luminosité"/>
+            <column name="manufacturer" value="Generic"/>
+            <column name="protocol" value="MQTT"/>
+            <column name="capabilities" value='{"telemetry":["lux","unit"],"commands":[]}'/>
+            <column name="icon" value="light_mode"/>
+        </insert>
+        <insert tableName="device_types">
+            <column name="id" value="11111111-0000-0000-0000-000000000007"/>
+            <column name="name" value="Actionneur lumière"/>
+            <column name="manufacturer" value="Generic"/>
+            <column name="protocol" value="MQTT"/>
+            <column name="capabilities" value='{"telemetry":[],"commands":["set_state"]}'/>
+            <column name="icon" value="lightbulb"/>
+        </insert>
+        <insert tableName="device_types">
+            <column name="id" value="11111111-0000-0000-0000-000000000008"/>
+            <column name="name" value="Volet connecté"/>
+            <column name="manufacturer" value="Generic"/>
+            <column name="protocol" value="MQTT"/>
+            <column name="capabilities" value='{"telemetry":[],"commands":["set_position"]}'/>
+            <column name="icon" value="blinds"/>
+        </insert>
+    </changeSet>
+
+</databaseChangeLog>
