@@ -1,0 +1,49 @@
+# SmartHome IoT Simulator Configuration
+broker:
+  host: 4108a3db64d742a5963319148924c7fd.s1.eu.hivemq.cloud
+  port: 8883
+  user: Soblito
+  password: "j'41m3HiveMQ"
+
+user_id: demo-user
+
+devices:
+  # Thermostat - salon
+  - id: thermo-salon
+    type: thermostat
+    interval_ms: 5000
+
+  # Temperature sensor - salon
+  - id: temp-salon
+    type: temperature_sensor
+    interval_ms: 5000
+
+  # Lux sensor - salon
+  - id: lux-salon
+    type: lux_sensor
+    interval_ms: 3000
+
+  # Light actuator - salon
+  - id: light-salon
+    type: light_actuator
+    interval_ms: 2000
+
+  # Shutter actuator - chambre
+  - id: shutter-chambre
+    type: shutter_actuator
+    interval_ms: 2000
+
+  # Smart Plug - salon
+  - id: plug-salon
+    type: smart_plug
+    interval_ms: 5000
+
+  # CO2 Air Quality Sensor - salon
+  - id: co2-salon
+    type: co2_sensor
+    interval_ms: 10000
+
+  # Motion Detector - chambre
+  - id: motion-bedroom
+    type: motion_detector
+    interval_ms: 2000

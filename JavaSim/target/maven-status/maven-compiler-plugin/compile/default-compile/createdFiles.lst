@@ -1,5 +1,2 @@
-com\smarthome\simulator\SmartHomeSimulator$LightCommand.class
 com\smarthome\simulator\SmartHomeSimulator$TemperatureMessage.class
-com\smarthome\simulator\SmartHomeSimulator$LuxMessage.class
-com\smarthome\simulator\SmartHomeSimulator$ShutterCommand.class
 com\smarthome\simulator\SmartHomeSimulator.class
