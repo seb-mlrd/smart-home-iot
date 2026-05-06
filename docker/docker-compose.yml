@@ -1,15 +1,4 @@
 services:
-  hivemq:
-    image: hivemq/hivemq-ce:latest
-    container_name: smarthome-hivemq
-    ports:
-      - "1883:1883"   # MQTT
-      - "8080:8080"   # Console web
-    volumes:
-      - ./hivemq/config:/opt/hivemq/conf
-    networks:
-      - smarthome-net
-
   timescaledb:
     image: timescale/timescaledb:latest-pg15
     container_name: smarthome-timescaledb

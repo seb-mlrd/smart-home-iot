@@ -10,5 +10,6 @@
     <include file="db/changelog/changes/003-create-devices.xml"/>
     <include file="db/changelog/changes/004-create-telemetry.xml"/>
     <include file="db/changelog/changes/005-create-device-commands.xml"/>
+    <include file="db/changelog/changes/006-seed-missing-device-types.xml"/>
 
 </databaseChangeLog>

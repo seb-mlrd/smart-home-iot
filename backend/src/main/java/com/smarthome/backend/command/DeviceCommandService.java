@@ -110,6 +110,13 @@ public class DeviceCommandService {
                 throw new InvalidCommandException("Command 'set_temperature' requires a numeric 'value' field");
             }
         }
+
+        if ("set_position".equalsIgnoreCase(request.command())) {
+            JsonNode payload = request.payload();
+            if (payload == null || !payload.has("position") || !payload.get("position").isNumber()) {
+                throw new InvalidCommandException("Command 'set_position' requires a numeric 'position' field (0-100)");
+            }
+        }
     }
 
     private boolean containsCommand(JsonNode commands, String command) {
