@@ -5,45 +5,45 @@ broker:
   user: Soblito
   password: "j'41m3HiveMQ"
 
-user_id: demo-user
+user_id: e04586e5-bcc2-41db-a922-9be3d1367c63
 
 devices:
   # Thermostat - salon
-  - id: thermo-salon
+  - id: 3c811eb6-52c2-430e-b148-d1d9bdc532d7
     type: thermostat
     interval_ms: 5000
 
-  # Temperature sensor - salon
-  - id: temp-salon
+  # Capteur de température - salon
+  - id: 2646c3df-601b-4d6a-ac2d-b14bb9f71b6c
     type: temperature_sensor
     interval_ms: 5000
 
-  # Lux sensor - salon
-  - id: lux-salon
+  # Capteur de luminosité - salon
+  - id: aa63d4b8-2b6b-43f9-8c42-b8a84c13d6fe
     type: lux_sensor
     interval_ms: 3000
 
-  # Light actuator - salon
-  - id: light-salon
+  # Actionneur lumière - salon
+  - id: 93eaab24-511c-4980-a24a-53fbd44b98d5
     type: light_actuator
     interval_ms: 2000
 
-  # Shutter actuator - chambre
-  - id: shutter-chambre
+  # Volet connecté - salon
+  - id: 72e1a42a-9dce-4d89-8e52-7d299edbc1d7
     type: shutter_actuator
     interval_ms: 2000
 
-  # Smart Plug - salon
-  - id: plug-salon
+  # Prise connectée - salon
+  - id: 879365c7-24ab-4f6e-af65-04b06c7ac87b
     type: smart_plug
     interval_ms: 5000
 
-  # CO2 Air Quality Sensor - salon
-  - id: co2-salon
+  # Capteur qualité d'air (CO2) - salon
+  - id: a9fc8739-2736-4d97-b93b-3196021aaf33
     type: co2_sensor
     interval_ms: 10000
 
-  # Motion Detector - chambre
-  - id: motion-bedroom
+  # Détecteur de mouvement - salon
+  - id: 7d67be63-37b8-4dd8-9e13-8d1c11cea793
     type: motion_detector
     interval_ms: 2000

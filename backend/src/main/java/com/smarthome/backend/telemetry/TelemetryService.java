@@ -1,8 +1,10 @@
 package com.smarthome.backend.telemetry;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smarthome.backend.device.DeviceService;
 import com.smarthome.backend.domain.device.DeviceRepository;
+import com.smarthome.backend.mqtt.dto.MetricItem;
 import com.smarthome.backend.mqtt.dto.TelemetryPayload;
 import com.smarthome.backend.telemetry.dto.TelemetryHistoryPoint;
 import com.smarthome.backend.telemetry.dto.TelemetryPointResponse;
@@ -15,9 +17,11 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -40,18 +44,44 @@ public class TelemetryService {
     private final SimpMessagingTemplate messagingTemplate;
     private final ObjectMapper objectMapper;
 
+    private static final Set<String> NON_METRIC_FIELDS =
+            Set.of("deviceid", "device_id", "ts", "timestamp", "unit");
+
     public void ingest(UUID deviceId, String jsonPayload) {
         try {
-            TelemetryPayload payload = objectMapper.readValue(jsonPayload, TelemetryPayload.class);
-            if (payload.metrics() == null || payload.metrics().isEmpty()) {
-                return;
+            JsonNode root = objectMapper.readTree(jsonPayload);
+            List<MetricItem> metrics;
+            OffsetDateTime time = OffsetDateTime.now();
+
+            if (root.has("metrics") && root.get("metrics").isArray()) {
+                TelemetryPayload payload = objectMapper.treeToValue(root, TelemetryPayload.class);
+                metrics = payload.metrics();
+                if (payload.timestamp() != null) time = payload.timestamp();
+            } else {
+                metrics = parseFlatJson(root);
             }
-            OffsetDateTime time = payload.timestamp() != null ? payload.timestamp() : OffsetDateTime.now();
-            telemetryRepo.insertBatch(deviceId, payload.metrics(), time);
-            broadcastTelemetry(deviceId, payload.metrics(), time);
+
+            if (metrics == null || metrics.isEmpty()) return;
+            telemetryRepo.insertBatch(deviceId, metrics, time);
+            broadcastTelemetry(deviceId, metrics, time);
         } catch (Exception e) {
             log.warn("Could not parse telemetry payload for device {}: {}", deviceId, e.getMessage());
         }
+    }
+
+    private List<MetricItem> parseFlatJson(JsonNode root) {
+        String commonUnit = root.has("unit") ? root.get("unit").asText() : null;
+        List<MetricItem> metrics = new ArrayList<>();
+        root.fields().forEachRemaining(entry -> {
+            if (NON_METRIC_FIELDS.contains(entry.getKey().toLowerCase())) return;
+            JsonNode val = entry.getValue();
+            if (val.isNumber()) {
+                metrics.add(new MetricItem(entry.getKey(), val.doubleValue(), commonUnit));
+            } else if (val.isBoolean()) {
+                metrics.add(new MetricItem(entry.getKey(), val.asBoolean() ? 1.0 : 0.0, null));
+            }
+        });
+        return metrics;
     }
 
     public List<TelemetryPointResponse> getLatest(UUID userId, UUID deviceId) {
