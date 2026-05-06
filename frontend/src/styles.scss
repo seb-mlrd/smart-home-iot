@@ -1,1 +1,94 @@
-/* You can add global styles to this file, and also import other style files */
+@use '@angular/material' as mat;
+
+html {
+  @include mat.theme((
+    color: (
+      primary: mat.$azure-palette,
+      theme-type: dark,
+    ),
+    typography: (
+      plain-family: 'Roboto, sans-serif',
+      brand-family: 'Roboto, sans-serif',
+    ),
+    density: 0,
+  ));
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  font-family: 'Roboto', sans-serif;
+  background: #0f172a;
+  color: #f1f5f9;
+}
+
+:root {
+  --sh-bg: #0f172a;
+  --sh-bg-card: #1e293b;
+  --sh-bg-card-hover: #253347;
+  --sh-border: #334155;
+  --sh-text: #f1f5f9;
+  --sh-text-muted: #94a3b8;
+  --sh-online: #22c55e;
+  --sh-offline: #ef4444;
+  --sh-error: #f59e0b;
+  --sh-accent: #3b82f6;
+  --sh-sidebar-width: 240px;
+}
+
+.sh-card {
+  background: var(--sh-bg-card);
+  border: 1px solid var(--sh-border);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+
+  &::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+  }
+
+  &.online {
+    color: var(--sh-online);
+    background: rgba(34, 197, 94, 0.12);
+  }
+
+  &.offline {
+    color: var(--sh-offline);
+    background: rgba(239, 68, 68, 0.12);
+  }
+
+  &.error {
+    color: var(--sh-error);
+    background: rgba(245, 158, 11, 0.12);
+  }
+}
+
+.mat-mdc-form-field {
+  width: 100%;
+}
+
+.mdc-text-field--outlined:not(.mdc-text-field--disabled) .mdc-notched-outline__leading,
+.mdc-text-field--outlined:not(.mdc-text-field--disabled) .mdc-notched-outline__notch,
+.mdc-text-field--outlined:not(.mdc-text-field--disabled) .mdc-notched-outline__trailing {
+  border-color: var(--sh-border) !important;
+}
