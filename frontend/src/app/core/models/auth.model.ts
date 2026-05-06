@@ -17,5 +17,6 @@ export interface AuthResponse {
 }
 
 export interface AuthUser {
+  id: string;
   email: string;
 }

@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, OnDestroy } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { MatButton, MatAnchor } from '@angular/material/button';
@@ -9,8 +9,11 @@ import { MatSelect } from '@angular/material/select';
 import { MatOption } from '@angular/material/core';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { DeviceService } from '../../../core/services/device.service';
+import { WebSocketService } from '../../../core/services/websocket.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { Device } from '../../../core/models/device.model';
 import { DeviceStatusBadgeComponent } from '../../../shared/components/device-status-badge/device-status-badge.component';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-device-list',
@@ -236,8 +239,11 @@ import { DeviceStatusBadgeComponent } from '../../../shared/components/device-st
     }
   `,
 })
-export class DeviceListComponent implements OnInit {
+export class DeviceListComponent implements OnInit, OnDestroy {
   private readonly deviceSvc = inject(DeviceService);
+  private readonly wsSvc = inject(WebSocketService);
+  private readonly authSvc = inject(AuthService);
+  private readonly subs: Subscription[] = [];
 
   devices = signal<Device[]>([]);
   loading = signal(true);
@@ -265,6 +271,25 @@ export class DeviceListComponent implements OnInit {
       next: (data) => { this.devices.set(data); this.loading.set(false); },
       error: () => this.loading.set(false),
     });
+    this.wsSvc.connect();
+    this.subscribeToStatusUpdates();
+  }
+
+  ngOnDestroy() {
+    this.subs.forEach(s => s.unsubscribe());
+  }
+
+  private subscribeToStatusUpdates() {
+    const userId = this.authSvc.currentUser()?.id;
+    if (!userId) return;
+    const sub = this.wsSvc.watchStatus(userId).subscribe({
+      next: ({ deviceId, status }) => {
+        this.devices.update(list =>
+          list.map(d => d.id === deviceId ? { ...d, status } : d)
+        );
+      },
+    });
+    this.subs.push(sub);
   }
 
   clearFilters() {

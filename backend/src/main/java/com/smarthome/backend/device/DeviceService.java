@@ -5,11 +5,13 @@ import com.smarthome.backend.domain.device.*;
 import com.smarthome.backend.domain.user.User;
 import com.smarthome.backend.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -18,6 +20,7 @@ public class DeviceService {
 
     private final DeviceRepository deviceRepository;
     private final DeviceTypeRepository deviceTypeRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @Transactional(readOnly = true)
     public List<DeviceResponse> getAll(UUID userId) {
@@ -72,6 +75,7 @@ public class DeviceService {
             device.setStatus(DeviceStatus.ONLINE);
             device.setLastSeenAt(OffsetDateTime.now());
             deviceRepository.save(device);
+            broadcastStatus(device.getUser().getId(), deviceId, "ONLINE");
         });
     }
 
@@ -80,7 +84,15 @@ public class DeviceService {
         deviceRepository.findById(deviceId).ifPresent(device -> {
             device.setStatus(DeviceStatus.OFFLINE);
             deviceRepository.save(device);
+            broadcastStatus(device.getUser().getId(), deviceId, "OFFLINE");
         });
+    }
+
+    private void broadcastStatus(UUID userId, UUID deviceId, String status) {
+        messagingTemplate.convertAndSend(
+                "/topic/devices/" + userId + "/status",
+                Map.of("deviceId", deviceId.toString(), "status", status)
+        );
     }
 
     private Device findOwned(UUID userId, UUID deviceId) {

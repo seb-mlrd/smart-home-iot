@@ -7,6 +7,8 @@ import { MatTab, MatTabGroup } from '@angular/material/tabs';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { DeviceService } from '../../../core/services/device.service';
 import { TelemetryService } from '../../../core/services/telemetry.service';
+import { WebSocketService } from '../../../core/services/websocket.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { Device, DeviceCommand, DeviceType } from '../../../core/models/device.model';
 import { TelemetryPoint } from '../../../core/models/telemetry.model';
 import { Subscription } from 'rxjs';
@@ -272,6 +274,8 @@ export class DeviceDetailComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly deviceSvc = inject(DeviceService);
   private readonly telemetrySvc = inject(TelemetryService);
+  private readonly wsSvc = inject(WebSocketService);
+  private readonly authSvc = inject(AuthService);
   private readonly subs: Subscription[] = [];
 
   device = signal<Device | null>(null);
@@ -304,9 +308,20 @@ export class DeviceDetailComponent implements OnInit, OnDestroy {
         this.deviceSvc.getDeviceTypes().subscribe({
           next: (types) => this.deviceType.set(types.find(t => t.id === d.deviceTypeId) ?? null),
         });
+        this.subscribeToLiveTelemetry(id);
       },
       error: () => this.loading.set(false),
     });
+  }
+
+  private subscribeToLiveTelemetry(deviceId: string) {
+    const userId = this.authSvc.currentUser()?.id;
+    if (!userId) return;
+    this.wsSvc.connect();
+    const sub = this.wsSvc.watchDevice(userId, deviceId).subscribe({
+      next: (metrics) => this.latestMetrics.set(metrics),
+    });
+    this.subs.push(sub);
   }
 
   private loadCommandHistory(deviceId: string) {

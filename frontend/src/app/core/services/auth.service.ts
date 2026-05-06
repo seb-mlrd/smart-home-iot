@@ -59,15 +59,15 @@ export class AuthService {
   private handleAuthResponse(response: AuthResponse): void {
     localStorage.setItem(AuthService.ACCESS_TOKEN_KEY, response.accessToken);
     localStorage.setItem(AuthService.REFRESH_TOKEN_KEY, response.refreshToken);
-    const email = this.decodeEmailFromJwt(response.accessToken);
-    this._currentUser.set(email ? { email } : null);
+    const user = this.decodeUserFromJwt(response.accessToken);
+    this._currentUser.set(user);
   }
 
   private hydrateFromStorage(): void {
     const token = this.getAccessToken();
     if (!token) return;
-    const email = this.decodeEmailFromJwt(token);
-    if (email) this._currentUser.set({ email });
+    const user = this.decodeUserFromJwt(token);
+    if (user) this._currentUser.set(user);
   }
 
   private clearSession(): void {
@@ -76,10 +76,12 @@ export class AuthService {
     this._currentUser.set(null);
   }
 
-  private decodeEmailFromJwt(token: string): string | null {
+  private decodeUserFromJwt(token: string): AuthUser | null {
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
-      return payload.sub ?? null;
+      const email = payload.sub ?? null;
+      const id = payload.userId ?? null;
+      return email ? { id, email } : null;
     } catch {
       return null;
     }

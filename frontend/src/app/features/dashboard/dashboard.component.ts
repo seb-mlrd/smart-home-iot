@@ -5,6 +5,7 @@ import { MatIcon } from '@angular/material/icon';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { DeviceService } from '../../core/services/device.service';
 import { WebSocketService } from '../../core/services/websocket.service';
+import { AuthService } from '../../core/services/auth.service';
 import { Device } from '../../core/models/device.model';
 import { TelemetryPoint } from '../../core/models/telemetry.model';
 import { DeviceCardComponent } from '../../shared/components/device-card/device-card.component';
@@ -176,6 +177,7 @@ import { Subscription } from 'rxjs';
 export class DashboardComponent implements OnInit, OnDestroy {
   private readonly deviceSvc = inject(DeviceService);
   private readonly wsSvc = inject(WebSocketService);
+  private readonly authSvc = inject(AuthService);
   private readonly subs: Subscription[] = [];
 
   devices = signal<Device[]>([]);
@@ -200,6 +202,20 @@ export class DashboardComponent implements OnInit, OnDestroy {
     });
     this.wsSvc.connect();
     this.wsConnected.set(true);
+    this.subscribeToStatusUpdates();
+  }
+
+  private subscribeToStatusUpdates() {
+    const userId = this.authSvc.currentUser()?.id;
+    if (!userId) return;
+    const sub = this.wsSvc.watchStatus(userId).subscribe({
+      next: ({ deviceId, status }) => {
+        this.devices.update(list =>
+          list.map(d => d.id === deviceId ? { ...d, status } : d)
+        );
+      },
+    });
+    this.subs.push(sub);
   }
 
   ngOnDestroy() {

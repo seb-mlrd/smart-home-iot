@@ -12,6 +12,7 @@ export class WebSocketService implements OnDestroy {
   private readonly stomp = new RxStomp();
 
   connect(): void {
+    if (this.stomp.active) return;
     const token = this.auth.getAccessToken();
     if (!token) return;
 
@@ -35,6 +36,14 @@ export class WebSocketService implements OnDestroy {
     return this.stomp
       .watch(`/topic/devices/${userId}/${deviceId}/telemetry`)
       .pipe(map(frame => JSON.parse(frame.body) as TelemetryPoint[]));
+  }
+
+  /** Subscribe to online/offline status changes for all devices of a user. */
+  watchStatus(userId: string): Observable<{ deviceId: string; status: string }> {
+    if (!this.stomp.active) return EMPTY;
+    return this.stomp
+      .watch(`/topic/devices/${userId}/status`)
+      .pipe(map(frame => JSON.parse(frame.body) as { deviceId: string; status: string }));
   }
 
   ngOnDestroy(): void {
