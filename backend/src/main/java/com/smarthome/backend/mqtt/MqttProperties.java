@@ -13,7 +13,8 @@ public record MqttProperties(
 ) {
     public record Topic(
             String telemetryWildcard,
-            String statusWildcard
+            String statusWildcard,
+            String commandAckWildcard
     ) {
     }
 }

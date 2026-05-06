@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import com.hivemq.client.mqtt.MqttClient;
 import com.hivemq.client.mqtt.mqtt5.Mqtt5AsyncClient;
 import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5Publish;
+import com.smarthome.backend.command.DeviceCommandAckService;
 import com.smarthome.backend.device.DeviceService;
 import com.smarthome.backend.telemetry.TelemetryService;
 
@@ -28,15 +29,18 @@ public class MqttService {
     private final MqttProperties mqttProperties;
     private final DeviceService deviceService;
     private final TelemetryService telemetryService;
+    private final DeviceCommandAckService deviceCommandAckService;
     private final AtomicBoolean started = new AtomicBoolean(false);
 
     private volatile Mqtt5AsyncClient client;
 
     public MqttService(MqttProperties mqttProperties, DeviceService deviceService,
-                       TelemetryService telemetryService) {
+                       TelemetryService telemetryService,
+                       DeviceCommandAckService deviceCommandAckService) {
         this.mqttProperties = mqttProperties;
         this.deviceService = deviceService;
         this.telemetryService = telemetryService;
+        this.deviceCommandAckService = deviceCommandAckService;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -71,6 +75,7 @@ public class MqttService {
         connectFuture
                 .thenCompose(ignored -> subscribeToTelemetry())
                 .thenCompose(ignored -> subscribeToStatus())
+                .thenCompose(ignored -> subscribeToCommandAck())
                 .exceptionally(throwable -> {
                     log.error("Unable to initialize MQTT client", throwable);
                     return null;
@@ -112,6 +117,15 @@ public class MqttService {
                 .thenApply(ignored -> null);
     }
 
+    private CompletableFuture<Void> subscribeToCommandAck() {
+        return client.subscribeWith()
+                .topicFilter(mqttProperties.topic().commandAckWildcard())
+                .callback(this::handleCommandAckMessage)
+                .send()
+                .thenAccept(subAck -> log.info("Subscribed to {}", mqttProperties.topic().commandAckWildcard()))
+                .thenApply(ignored -> null);
+    }
+
     // topic: home/{userId}/device/{deviceId}/telemetry → deviceId at index 3
     private void handleTelemetryMessage(Mqtt5Publish publish) {
         String topic = publish.getTopic().toString();
@@ -135,6 +149,13 @@ public class MqttService {
                 deviceService.updateDeviceOnline(deviceId);
             }
         });
+    }
+
+    private void handleCommandAckMessage(Mqtt5Publish publish) {
+        String topic = publish.getTopic().toString();
+        String payload = extractPayload(publish);
+        log.info("MQTT command ack on {}: {}", topic, payload);
+        parseDeviceId(topic, 3).ifPresent(deviceId -> deviceCommandAckService.handleAck(deviceId, payload));
     }
 
     private String extractPayload(Mqtt5Publish publish) {
