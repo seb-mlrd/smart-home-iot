@@ -93,7 +93,7 @@ import { MatIcon } from '@angular/material/icon';
   template: `
     <div class="metric-card">
       <div class="card-header">
-        <span class="metric-name">{{ metric() }}</span>
+        <span class="metric-name">{{ metricLabel() }}</span>
         <div class="metric-icon">
           <mat-icon>{{ icon() }}</mat-icon>
         </div>
@@ -124,6 +124,29 @@ export class MetricCardComponent {
   unit = input<string | null>(null);
   icon = input<string>('sensors');
   trend = input<'up' | 'down' | 'stable' | null>(null);
+
+  metricLabel = computed(() => {
+    switch (this.metric()) {
+      case 'temperature':         return 'Température';
+      case 'humidity':            return 'Humidité';
+      case 'target_temperature':  return 'Consigne';
+      case 'heating_active':      return 'Chauffage';
+      case 'co2_ppm':             return 'CO₂';
+      case 'pm25':                return 'Particules fines';
+      case 'air_quality_index':   return 'Qualité de l\'air';
+      case 'power_w':             return 'Puissance';
+      case 'voltage_v':           return 'Tension';
+      case 'current_a':           return 'Intensité';
+      case 'energy_kwh_total':    return 'Énergie totale';
+      case 'is_on':               return 'État';
+      case 'motion_detected':     return 'Mouvement';
+      case 'door_open':           return 'Porte ouverte';
+      case 'battery_level':       return 'Batterie';
+      case 'lux':                 return 'Luminosité';
+      case 'position':            return 'Position';
+      default:                    return this.metric();
+    }
+  });
 
   trendIcon = computed(() => {
     switch (this.trend()) {

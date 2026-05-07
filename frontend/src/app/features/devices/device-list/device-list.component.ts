@@ -1,7 +1,7 @@
 import { Component, inject, signal, computed, OnInit, OnDestroy } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { MatButton, MatAnchor } from '@angular/material/button';
+import { MatButton, MatAnchor, MatIconButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { MatFormField, MatLabel } from '@angular/material/form-field';
 import { MatInput } from '@angular/material/input';
@@ -20,7 +20,7 @@ import { Subscription } from 'rxjs';
   standalone: true,
   imports: [
     RouterLink, FormsModule,
-    MatButton, MatAnchor, MatIcon, MatFormField, MatLabel, MatInput, MatSelect, MatOption, MatProgressSpinner,
+    MatButton, MatAnchor, MatIconButton, MatIcon, MatFormField, MatLabel, MatInput, MatSelect, MatOption, MatProgressSpinner,
     DeviceStatusBadgeComponent,
   ],
   styles: [`
@@ -125,13 +125,14 @@ import { Subscription } from 'rxjs';
       padding: 12px 18px;
       border-top: 1px solid var(--sh-border);
       display: flex;
+      align-items: stretch;
       gap: 8px;
     }
 
     .delete-btn {
       color: var(--sh-text-muted);
-      min-width: 44px;
-      padding: 0 8px;
+      border: 1px solid var(--sh-border);
+      border-radius: 50%;
 
       &:hover:not(:disabled) { color: var(--sh-offline); border-color: var(--sh-offline); }
     }
@@ -228,7 +229,7 @@ import { Subscription } from 'rxjs';
                 <mat-icon>visibility</mat-icon>
                 Voir
               </a>
-              <button mat-stroked-button class="delete-btn"
+              <button mat-icon-button class="delete-btn"
                       (click)="deleteDevice($event, device)"
                       [disabled]="deletingId() === device.id"
                       title="Supprimer">

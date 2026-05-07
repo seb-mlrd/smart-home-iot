@@ -2,8 +2,10 @@ import { Component, inject, signal, computed, OnInit, OnDestroy } from '@angular
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { DatePipe, JsonPipe } from '@angular/common';
 import { MatIcon } from '@angular/material/icon';
+import { MatIconButton } from '@angular/material/button';
 import { MatTab, MatTabGroup } from '@angular/material/tabs';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
+import { MatTooltip } from '@angular/material/tooltip';
 import { DeviceService } from '../../../core/services/device.service';
 import { TelemetryService } from '../../../core/services/telemetry.service';
 import { WebSocketService } from '../../../core/services/websocket.service';
@@ -22,7 +24,7 @@ import { CommandButtonComponent } from '../../../shared/components/command-butto
   standalone: true,
   imports: [
     RouterLink, DatePipe, JsonPipe,
-    MatIcon,
+    MatIcon, MatIconButton, MatTooltip,
     MatTab, MatTabGroup, MatProgressSpinner,
     DeviceStatusBadgeComponent, MetricCardComponent,
     TimeSeriesChartComponent, CommandButtonComponent,
@@ -154,13 +156,12 @@ import { CommandButtonComponent } from '../../../shared/components/command-butto
     .center { display: flex; justify-content: center; padding: 80px; }
     .error-msg { color: var(--sh-offline); text-align: center; padding: 40px; }
 
-    .delete-btn {
-      color: var(--sh-offline);
-      border-color: rgba(239, 68, 68, 0.3);
-      font-size: 0.85rem;
+    .delete-icon-btn {
+      color: var(--sh-text-muted);
+      opacity: 0.6;
+      transition: opacity 0.15s, color 0.15s;
 
-      mat-icon { font-size: 18px; width: 18px; height: 18px; }
-      &:hover:not(:disabled) { background: rgba(239, 68, 68, 0.08); }
+      &:hover:not(:disabled) { opacity: 1; color: var(--sh-offline); }
     }
   `],
   template: `
@@ -190,11 +191,13 @@ import { CommandButtonComponent } from '../../../shared/components/command-butto
             }
           </div>
         </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px">
+        <div style="display:flex;align-items:center;gap:10px">
           <app-device-status-badge [status]="device()!.status" />
-          <button mat-stroked-button class="delete-btn" (click)="deleteDevice()" [disabled]="deleting()">
+          <button mat-icon-button class="delete-icon-btn"
+                  matTooltip="Supprimer l'appareil"
+                  (click)="deleteDevice()"
+                  [disabled]="deleting()">
             <mat-icon>delete_outline</mat-icon>
-            Supprimer
           </button>
         </div>
       </div>
@@ -241,8 +244,15 @@ import { CommandButtonComponent } from '../../../shared/components/command-butto
                     <app-command-button
                       [deviceId]="device()!.id"
                       [command]="cmd"
+                      [label]="commandLabel(cmd)"
+                      [icon]="commandIcon(cmd)"
+                      [description]="commandDescription(cmd)"
+                      [isInstantToggle]="cmd === 'toggle'"
+                      [isToggle]="cmd === 'set_state'"
                       [withValueInput]="needsValueInput(cmd)"
                       [valueLabel]="valueLabel(cmd)"
+                      [valueType]="commandValueType(cmd)"
+                      [payloadKey]="commandPayloadKey(cmd)"
                       (sent)="onCommandSent()" />
                   }
                 </div>
@@ -334,10 +344,20 @@ export class DeviceDetailComponent implements OnInit, OnDestroy {
     const userId = this.authSvc.currentUser()?.id;
     if (!userId) return;
     this.wsSvc.connect();
-    const sub = this.wsSvc.watchDevice(userId, deviceId).subscribe({
+
+    const telSub = this.wsSvc.watchDevice(userId, deviceId).subscribe({
       next: (metrics) => this.latestMetrics.set(metrics),
     });
-    this.subs.push(sub);
+
+    const statusSub = this.wsSvc.watchStatus(userId).subscribe({
+      next: ({ deviceId: id, status }) => {
+        if (id === deviceId) {
+          this.device.update(d => d ? { ...d, status } : d);
+        }
+      },
+    });
+
+    this.subs.push(telSub, statusSub);
   }
 
   private loadCommandHistory(deviceId: string) {
@@ -386,13 +406,75 @@ export class DeviceDetailComponent implements OnInit, OnDestroy {
   }
 
   needsValueInput(command: string): boolean {
-    return ['set_temperature', 'set_state', 'set_brightness', 'set_position'].includes(command);
+    return ['set_temperature', 'set_brightness', 'set_position'].includes(command);
   }
 
   valueLabel(command: string): string {
     if (command === 'set_temperature') return 'Température (°C)';
-    if (command === 'set_position') return 'Position (0-100)';
-    if (command === 'set_brightness') return 'Luminosité (0-100)';
+    if (command === 'set_position') return 'Position (0–100)';
+    if (command === 'set_brightness') return 'Luminosité (0–100)';
+    if (command === 'set_state') return 'État — true (on) ou false (off)';
     return 'Valeur';
+  }
+
+  commandValueType(command: string): 'text' | 'number' {
+    return command === 'set_state' ? 'text' : 'number';
+  }
+
+  commandPayloadKey(command: string): string {
+    if (command === 'set_position') return 'position';
+    if (command === 'set_state') return 'state';
+    return 'value';
+  }
+
+  commandLabel(command: string): string {
+    switch (command) {
+      case 'turn_on':         return 'Allumer';
+      case 'turn_off':        return 'Éteindre';
+      case 'toggle':          return 'Allumer / Éteindre';
+      case 'set_temperature': return 'Régler la température';
+      case 'set_brightness':  return 'Régler la luminosité';
+      case 'set_position':    return 'Régler la position';
+      case 'set_state':       return 'Changer l\'état';
+      case 'open':            return 'Ouvrir';
+      case 'close':           return 'Fermer';
+      case 'reboot':          return 'Redémarrer';
+      case 'reset':           return 'Réinitialiser';
+      default:                return command;
+    }
+  }
+
+  commandIcon(command: string): string {
+    switch (command) {
+      case 'turn_on':         return 'power_settings_new';
+      case 'turn_off':        return 'power_off';
+      case 'toggle':          return 'swap_horiz';
+      case 'set_temperature': return 'thermostat';
+      case 'set_brightness':  return 'light_mode';
+      case 'set_position':    return 'height';
+      case 'set_state':       return 'tune';
+      case 'open':            return 'lock_open';
+      case 'close':           return 'lock';
+      case 'reboot':          return 'restart_alt';
+      case 'reset':           return 'restore';
+      default:                return 'send';
+    }
+  }
+
+  commandDescription(command: string): string {
+    switch (command) {
+      case 'turn_on':         return 'Met l\'appareil sous tension';
+      case 'turn_off':        return 'Coupe l\'alimentation de l\'appareil';
+      case 'toggle':          return 'Bascule entre allumé et éteint';
+      case 'set_temperature': return 'Définit la consigne de température cible';
+      case 'set_brightness':  return 'Ajuste le niveau de luminosité (0–100 %)';
+      case 'set_position':    return 'Positionne le volet ou l\'actionneur (0–100 %)';
+      case 'set_state':       return 'Allume ou éteint l\'appareil — saisir true ou false';
+      case 'open':            return 'Ouvre le verrou ou le volet';
+      case 'close':           return 'Ferme le verrou ou le volet';
+      case 'reboot':          return 'Redémarre l\'appareil à distance';
+      case 'reset':           return 'Réinitialise l\'appareil aux valeurs par défaut';
+      default:                return 'Envoie la commande à l\'appareil';
+    }
   }
 }

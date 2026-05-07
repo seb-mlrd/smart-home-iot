@@ -97,7 +97,7 @@ import { TelemetryPeriod, TelemetryResolution, TelemetryStats } from '../../../c
         <mat-label>Métrique</mat-label>
         <mat-select [(ngModel)]="selectedMetric" (ngModelChange)="load()">
           @for (m of metrics(); track m) {
-            <mat-option [value]="m">{{ m }}</mat-option>
+            <mat-option [value]="m">{{ metricLabel(m) }}</mat-option>
           }
         </mat-select>
       </mat-form-field>
@@ -280,6 +280,29 @@ export class TimeSeriesChartComponent implements OnInit, OnChanges {
         this.stats.set(null);
       },
     });
+  }
+
+  metricLabel(metric: string): string {
+    switch (metric) {
+      case 'temperature':         return 'Température';
+      case 'humidity':            return 'Humidité';
+      case 'target_temperature':  return 'Consigne';
+      case 'heating_active':      return 'Chauffage';
+      case 'co2_ppm':             return 'CO₂';
+      case 'pm25':                return 'Particules fines';
+      case 'air_quality_index':   return 'Qualité de l\'air';
+      case 'power_w':             return 'Puissance';
+      case 'voltage_v':           return 'Tension';
+      case 'current_a':           return 'Intensité';
+      case 'energy_kwh_total':    return 'Énergie totale';
+      case 'is_on':               return 'État';
+      case 'motion_detected':     return 'Mouvement';
+      case 'door_open':           return 'Porte ouverte';
+      case 'battery_level':       return 'Batterie';
+      case 'lux':                 return 'Luminosité';
+      case 'position':            return 'Position';
+      default:                    return metric;
+    }
   }
 
   fmt(val: number | null | undefined): string {

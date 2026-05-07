@@ -12,5 +12,6 @@
     <include file="db/changelog/changes/005-create-device-commands.xml"/>
     <include file="db/changelog/changes/006-seed-missing-device-types.xml"/>
     <include file="db/changelog/changes/007-update-device-type-capabilities.xml"/>
+    <include file="db/changelog/changes/008-deduplicate-commands.xml"/>
 
 </databaseChangeLog>
