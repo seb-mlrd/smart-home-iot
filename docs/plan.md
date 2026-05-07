@@ -14,7 +14,7 @@
 | 8 | Backend : catalogue device types + endpoint telemetry stats | Yvan | 1h | 1h | Lot 2 | Fait |
 | 9 | Simulateur JavaSim (multi-appareils, MQTT) | Yvan | 2h | 2h | Lot 3 | Fait |
 | 10 | Documentation (ADR, architecture, tensions, defense) | Yvan | 2h | — | Tout | En cours |
-| 11 | CI GitHub Actions (lint + build) | — | 1h | — | — | Non fait |
+| 11 | CI GitHub Actions (lint + build) | Yvan | 1h | — | — | Fait |
 | 12 | Tests unitaires + E2E chemin critique | — | 2h | — | — | Non fait |
 
 ## Chemins critiques
@@ -24,6 +24,5 @@ Le lot 3 (ingestion MQTT) bloquait les lots 6 (WebSocket) et 7 (pilotage). Il a 
 ## Ce qui n'a pas été fait (hors-scope assumé)
 
 - **Tests automatisés** : setup du contexte Spring Boot de test + mocking MQTT trop long pour le temps imparti. Chemin critique validé manuellement.
-- **Pipeline CI** : GitHub Actions non configuré, priorité donnée à la réalisation fonctionnelle.
 - **Déploiement staging** : architecture documentée (OVHcloud) mais non provisionnée.
 - **Monitoring RED** : pas de Prometheus/Grafana. Logs applicatifs Spring Boot disponibles.
