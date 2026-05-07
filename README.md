@@ -2,6 +2,37 @@
 
 Plateforme de gestion d'objets connectés en temps réel. Un backend Spring Boot ingère la télémétrie MQTT de vos appareils, la persiste dans TimescaleDB et la pousse en direct vers un frontend Angular via WebSocket STOMP.
 
+## Équipe
+
+- Yvan Kerdanet — backend, MQTT, WebSocket, simulateur
+- Sébastien Maillard — backend CRUD/auth, frontend Angular
+
+## Contraintes & arbitrages
+
+- **Souveraineté des données (France/Europe)** — voir [ADR-001](docs/adr/0001-vendor-lockin.md) et [ADR-002](docs/adr/0002-disponibilite-souverainete.md)
+- **Disponibilité critique (99,999%)** — voir [ADR-002](docs/adr/0002-disponibilite-souverainete.md)
+
+## État du projet
+
+**Ce qui tourne :** ingestion MQTT → TimescaleDB → WebSocket → frontend temps réel, auth JWT, CRUD appareils, pilotage via commandes MQTT, simulateur JavaSim.
+
+**Ce qui ne tourne pas :** pas de déploiement cloud (démo en local), pas de tests automatisés, pas de CI.
+
+## Documentation
+
+| Document | Contenu |
+| --- | --- |
+| [docs/architecture.md](docs/architecture.md) | Architecture détaillée, modèle de données, RPO/RTO |
+| [docs/adr/0001-vendor-lockin.md](docs/adr/0001-vendor-lockin.md) | Trade-off HiveMQ Cloud vs self-hosted, plan de migration |
+| [docs/adr/0002-disponibilite-souverainete.md](docs/adr/0002-disponibilite-souverainete.md) | Arbitrage 99,999% vs souveraineté |
+| [docs/adr/0003-base-de-donnees.md](docs/adr/0003-base-de-donnees.md) | TimescaleDB vs InfluxDB vs PostgreSQL |
+| [docs/plan.md](docs/plan.md) | Lots de travail, statuts, ce qui n'a pas été fait |
+| [docs/tensions.md](docs/tensions.md) | Auto-audit du brief, tensions identifiées |
+| [docs/defense.md](docs/defense.md) | Anticipation Q&A |
+| [docs/postmortem.md](docs/postmortem.md) | Ce qui a marché, raté, surprises |
+
+---
+
 ## Stack technique
 
 | Couche | Technologie |

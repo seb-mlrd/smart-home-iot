@@ -1,7 +1,6 @@
 import { Component, inject, signal, computed, OnInit, OnDestroy } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { DatePipe, JsonPipe } from '@angular/common';
-import { MatButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { MatTab, MatTabGroup } from '@angular/material/tabs';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
@@ -23,7 +22,7 @@ import { CommandButtonComponent } from '../../../shared/components/command-butto
   standalone: true,
   imports: [
     RouterLink, DatePipe, JsonPipe,
-    MatButton, MatIcon,
+    MatIcon,
     MatTab, MatTabGroup, MatProgressSpinner,
     DeviceStatusBadgeComponent, MetricCardComponent,
     TimeSeriesChartComponent, CommandButtonComponent,

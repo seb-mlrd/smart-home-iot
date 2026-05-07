@@ -4,6 +4,7 @@ import { Observable, EMPTY } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 import { TelemetryPoint } from '../models/telemetry.model';
+import { DeviceStatus } from '../models/device.model';
 import { AuthService } from './auth.service';
 
 @Injectable({ providedIn: 'root' })
@@ -39,11 +40,11 @@ export class WebSocketService implements OnDestroy {
   }
 
   /** Subscribe to online/offline status changes for all devices of a user. */
-  watchStatus(userId: string): Observable<{ deviceId: string; status: string }> {
+  watchStatus(userId: string): Observable<{ deviceId: string; status: DeviceStatus }> {
     if (!this.stomp.active) return EMPTY;
     return this.stomp
       .watch(`/topic/devices/${userId}/status`)
-      .pipe(map(frame => JSON.parse(frame.body) as { deviceId: string; status: string }));
+      .pipe(map(frame => JSON.parse(frame.body) as { deviceId: string; status: DeviceStatus }));
   }
 
   ngOnDestroy(): void {
