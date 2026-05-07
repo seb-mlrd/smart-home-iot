@@ -6,7 +6,7 @@ import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { DeviceService } from '../../core/services/device.service';
 import { WebSocketService } from '../../core/services/websocket.service';
 import { AuthService } from '../../core/services/auth.service';
-import { Device } from '../../core/models/device.model';
+import { Device, DeviceStatus } from '../../core/models/device.model';
 import { TelemetryPoint } from '../../core/models/telemetry.model';
 import { DeviceCardComponent } from '../../shared/components/device-card/device-card.component';
 import { Subscription } from 'rxjs';
@@ -18,15 +18,17 @@ import { Subscription } from 'rxjs';
   styles: [`
     .page-header {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: space-between;
+      gap: 12px;
       margin-bottom: 28px;
+      flex-wrap: wrap;
 
       h1 { margin: 0; font-size: 1.6rem; font-weight: 700; color: var(--sh-text); }
       p { margin: 4px 0 0; color: var(--sh-text-muted); font-size: 0.875rem; }
     }
 
-    .header-actions { display: flex; align-items: center; gap: 12px; }
+    .header-actions { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
 
     .ws-badge {
       display: inline-flex;
@@ -113,6 +115,26 @@ import { Subscription } from 'rxjs';
     }
 
     .center { display: flex; justify-content: center; padding: 60px; }
+
+    @media (max-width: 640px) {
+      .page-header {
+        margin-bottom: 20px;
+        h1 { font-size: 1.3rem; }
+      }
+
+      .stats-grid { grid-template-columns: 1fr; gap: 10px; margin-bottom: 20px; }
+
+      .stat-card { padding: 14px 16px; }
+
+      .devices-grid { grid-template-columns: 1fr; gap: 12px; }
+
+      .ws-badge { display: none; }
+    }
+
+    @media (min-width: 641px) and (max-width: 1024px) {
+      .stats-grid { grid-template-columns: repeat(3, 1fr); gap: 12px; }
+      .devices-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+    }
   `],
   template: `
     <div class="page-header">
@@ -211,7 +233,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     const sub = this.wsSvc.watchStatus(userId).subscribe({
       next: ({ deviceId, status }) => {
         this.devices.update(list =>
-          list.map(d => d.id === deviceId ? { ...d, status } : d)
+          list.map(d => d.id === deviceId ? { ...d, status: status as DeviceStatus } : d)
         );
       },
     });

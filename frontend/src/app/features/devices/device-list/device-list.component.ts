@@ -11,7 +11,7 @@ import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { DeviceService } from '../../../core/services/device.service';
 import { WebSocketService } from '../../../core/services/websocket.service';
 import { AuthService } from '../../../core/services/auth.service';
-import { Device } from '../../../core/models/device.model';
+import { Device, DeviceStatus } from '../../../core/models/device.model';
 import { DeviceStatusBadgeComponent } from '../../../shared/components/device-status-badge/device-status-badge.component';
 import { Subscription } from 'rxjs';
 
@@ -28,6 +28,8 @@ import { Subscription } from 'rxjs';
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
       margin-bottom: 28px;
 
       h1 { margin: 0; font-size: 1.6rem; font-weight: 700; color: var(--sh-text); }
@@ -39,8 +41,8 @@ import { Subscription } from 'rxjs';
       margin-bottom: 24px;
       flex-wrap: wrap;
 
-      .search-field { flex: 1; min-width: 200px; }
-      .filter-select { width: 160px; }
+      .search-field { flex: 1; min-width: 180px; }
+      .filter-select { width: 150px; }
     }
 
     .results-count {
@@ -53,6 +55,17 @@ import { Subscription } from 'rxjs';
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
       gap: 16px;
+    }
+
+    @media (max-width: 640px) {
+      .page-header { margin-bottom: 20px; h1 { font-size: 1.3rem; } }
+      .filters { gap: 8px; margin-bottom: 16px; }
+      .filters .filter-select { width: 100%; }
+      .devices-grid { grid-template-columns: 1fr; gap: 12px; }
+    }
+
+    @media (min-width: 641px) and (max-width: 1024px) {
+      .devices-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
     }
 
     .device-card {
@@ -285,7 +298,7 @@ export class DeviceListComponent implements OnInit, OnDestroy {
     const sub = this.wsSvc.watchStatus(userId).subscribe({
       next: ({ deviceId, status }) => {
         this.devices.update(list =>
-          list.map(d => d.id === deviceId ? { ...d, status } : d)
+          list.map(d => d.id === deviceId ? { ...d, status: status as DeviceStatus } : d)
         );
       },
     });
