@@ -9,8 +9,10 @@ import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { MatTooltip } from '@angular/material/tooltip';
 import { BaseChartDirective, provideCharts, withDefaultRegisterables } from 'ng2-charts';
 import { ChartConfiguration, ChartData } from 'chart.js';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import { TelemetryService } from '../../../core/services/telemetry.service';
-import { TelemetryPeriod, TelemetryResolution } from '../../../core/models/telemetry.model';
+import { TelemetryPeriod, TelemetryResolution, TelemetryStats } from '../../../core/models/telemetry.model';
 
 @Component({
   selector: 'app-time-series-chart',
@@ -33,6 +35,40 @@ import { TelemetryPeriod, TelemetryResolution } from '../../../core/models/telem
       align-items: center;
 
       .metric-select, .period-select { width: 155px; }
+    }
+
+    .stats-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .stat-card {
+      flex: 1;
+      min-width: 80px;
+      background: var(--sh-bg-card, rgba(30,41,59,0.6));
+      border: 1px solid var(--sh-border, rgba(51,65,85,0.8));
+      border-radius: 8px;
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .stat-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .stat-value {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--sh-text, #e2e8f0);
+      font-variant-numeric: tabular-nums;
     }
 
     .chart-wrap {
@@ -82,6 +118,27 @@ import { TelemetryPeriod, TelemetryResolution } from '../../../core/models/telem
       </button>
     </div>
 
+    @if (stats()) {
+      <div class="stats-row">
+        <div class="stat-card">
+          <span class="stat-label">Min</span>
+          <span class="stat-value">{{ fmt(stats()!.min) }}</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Max</span>
+          <span class="stat-value">{{ fmt(stats()!.max) }}</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Moyenne</span>
+          <span class="stat-value">{{ fmt(stats()!.avg) }}</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Dernier</span>
+          <span class="stat-value">{{ fmt(stats()!.last) }}</span>
+        </div>
+      </div>
+    }
+
     @if (loading()) {
       <div class="center"><mat-progress-spinner mode="indeterminate" diameter="36" /></div>
     } @else if (isEmpty()) {
@@ -113,6 +170,7 @@ export class TimeSeriesChartComponent implements OnInit, OnChanges {
 
   loading = signal(false);
   isEmpty = signal(true);
+  stats = signal<TelemetryStats | null>(null);
 
   chartData = signal<ChartData<'line'>>({
     labels: [],
@@ -177,13 +235,19 @@ export class TimeSeriesChartComponent implements OnInit, OnChanges {
     const now = new Date();
     const from = this.periodStart(now);
 
-    this.telemetrySvc.getHistory(this.deviceId(), {
-      metric: this.selectedMetric,
-      from: from.toISOString(),
-      to: now.toISOString(),
-      resolution: this.resolution(),
+    forkJoin({
+      points: this.telemetrySvc.getHistory(this.deviceId(), {
+        metric: this.selectedMetric,
+        from: from.toISOString(),
+        to: now.toISOString(),
+        resolution: this.resolution(),
+      }),
+      stats: this.telemetrySvc.getStats(this.deviceId(), this.selectedMetric, this.selectedPeriod)
+        .pipe(catchError(() => of(null))),
     }).subscribe({
-      next: (points) => {
+      next: ({ points, stats }) => {
+        this.stats.set(stats && stats.count > 0 ? stats : null);
+
         const valid = points.filter(p => p.value !== null);
         this.isEmpty.set(valid.length === 0);
 
@@ -203,7 +267,7 @@ export class TimeSeriesChartComponent implements OnInit, OnChanges {
             borderColor: '#3b82f6',
             backgroundColor: 'rgba(59,130,246,0.08)',
             borderWidth: 2,
-            pointRadius: 2,
+            pointRadius: valid.length > 80 ? 0 : 2,
             tension: 0.3,
             fill: true,
           }],
@@ -213,8 +277,14 @@ export class TimeSeriesChartComponent implements OnInit, OnChanges {
       error: () => {
         this.loading.set(false);
         this.isEmpty.set(true);
+        this.stats.set(null);
       },
     });
+  }
+
+  fmt(val: number | null | undefined): string {
+    if (val === null || val === undefined) return '—';
+    return Number.isInteger(val) ? String(val) : parseFloat(val.toFixed(2)).toString();
   }
 
   private periodStart(now: Date): Date {

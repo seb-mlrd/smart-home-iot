@@ -63,7 +63,7 @@ public class TelemetryJdbcRepository {
                                             String resolution) {
         return switch (resolution) {
             case "5m" -> findHistoryAggregated(deviceId, metric, from, to, "5 minutes");
-            case "1h" -> findHistoryHourly(deviceId, metric, from, to);
+            case "1h" -> findHistoryAggregated(deviceId, metric, from, to, "1 hour");
             case "1d" -> findHistoryAggregated(deviceId, metric, from, to, "1 day");
             default   -> findHistoryRaw(deviceId, metric, from, to);
         };
