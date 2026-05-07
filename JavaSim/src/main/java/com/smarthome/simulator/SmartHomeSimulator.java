@@ -100,14 +100,12 @@ public class SmartHomeSimulator {
 
         System.out.printf("[SYSTEM] Demarrage du simulateur SmartHome sur broker '%s:%d' (user=%s) userId=%s%n", brokerHostRef[0], brokerPortRef[0], brokerUserRef[0], userIdRef[0]);
 
-        // if no devices defined, fallback to a default thermostat for quick testing
-        if (devices.isEmpty()) {
-            Map<String, String> thermo = new HashMap<>();
-            thermo.put("id", "thermo-salon");
-            thermo.put("type", "thermostat");
-            thermo.put("interval_ms", "5000");
-            devices.add(thermo);
-        }
+        // Control subscriber: listens for new devices added from the frontend
+        final String[] hostRef = brokerHostRef;
+        final int[] portRef = brokerPortRef;
+        final String[] userRef = brokerUserRef;
+        final String[] passRef = brokerPasswordRef;
+        new Thread(() -> runControlSubscriber(hostRef[0], portRef[0], userRef[0], passRef[0]), "simulator-control").start();
 
         for (Map<String, String> dev : devices) {
             String id = dev.get("id");
@@ -259,10 +257,12 @@ public class SmartHomeSimulator {
             double currentValue = ThreadLocalRandom.current().nextDouble(19.0, 23.0);
 
             while (!Thread.currentThread().isInterrupted()) {
-                double luxInfluence = computeLuxBaseLevel() - 550.0;
-                double driftTowardComfort = luxInfluence * 0.08;
+                // Target temp follows time of day: 19°C at night, 23°C at noon
+                double lux = computeLuxBaseLevel();
+                double targetTemp = 19.0 + (lux - 100.0) / 900.0 * 4.0;
+                double drift = (targetTemp - currentValue) * 0.05;
                 double randomNoise = ThreadLocalRandom.current().nextDouble(TEMP_NOISE_MIN, TEMP_NOISE_MAX);
-                currentValue = Math.max(18.0, Math.min(currentValue + driftTowardComfort + randomNoise, 25.0));
+                currentValue = Math.max(18.0, Math.min(currentValue + drift + randomNoise, 25.0));
 
                 double value = Math.round(currentValue * 10.0) / 10.0;
                 ObjectNode payload = MAPPER.createObjectNode();
@@ -420,41 +420,66 @@ public class SmartHomeSimulator {
     private static void runLightActuator(String host, int port, String username, String password, String userId, String deviceId, int intervalMs) {
         String clientId = "sim-" + userId + "-" + deviceId;
         String commandTopic = String.format("home/%s/device/%s/command", userId, deviceId);
+        String commandAckTopic = String.format("home/%s/device/%s/command/ack", userId, deviceId);
+        String telemetryTopic = String.format("home/%s/device/%s/telemetry", userId, deviceId);
         String statusTopic = String.format("home/%s/device/%s/status", userId, deviceId);
         Mqtt5BlockingClient client = createBlockingClientWithWill(host, port, clientId, username, password, statusTopic, "OFFLINE");
-        String lastState = null;
+
+        final boolean[] isOn = { false };
 
         try {
             client.connect();
             System.out.printf("[LIGHT:%s] Connecte au broker avec clientId=%s%n", deviceId, clientId);
-
-            // publish ONLINE status
             client.publishWith().topic(statusTopic).qos(MqttQos.AT_LEAST_ONCE).payload("ONLINE".getBytes(StandardCharsets.UTF_8)).send();
 
             client.subscribeWith().topicFilter(commandTopic).qos(MqttQos.AT_LEAST_ONCE).send();
             System.out.printf("[LIGHT:%s] Abonne au topic %s%n", deviceId, commandTopic);
 
-            try (Mqtt5BlockingClient.Mqtt5Publishes publishes = client.publishes(MqttGlobalPublishFilter.SUBSCRIBED)) {
-                while (!Thread.currentThread().isInterrupted()) {
-                    Mqtt5Publish publish = publishes.receive();
-                    if (publish == null || publish.getPayload().isEmpty()) continue;
-
-                    String body = StandardCharsets.UTF_8.decode(publish.getPayload().get()).toString();
-                    try {
-                        ObjectNode node = (ObjectNode) MAPPER.readTree(body);
-                        String state = node.has("state") ? node.get("state").asText().toUpperCase() : "OFF";
-                        if (state.equals(lastState)) {
-                            System.out.printf("[LIGHT:%s] Etat identique ignore (%s)%n", deviceId, state);
-                            continue;
+            Thread subscriber = new Thread(() -> {
+                try (Mqtt5BlockingClient.Mqtt5Publishes publishes = client.publishes(MqttGlobalPublishFilter.SUBSCRIBED)) {
+                    while (!Thread.currentThread().isInterrupted()) {
+                        Mqtt5Publish publish = publishes.receive();
+                        if (publish == null || publish.getPayload().isEmpty()) continue;
+                        String body = StandardCharsets.UTF_8.decode(publish.getPayload().get()).toString();
+                        try {
+                            ObjectNode node = (ObjectNode) MAPPER.readTree(body);
+                            String commandId = node.has("commandId") ? node.get("commandId").asText() : UUID.randomUUID().toString();
+                            String type = node.has("type") ? node.get("type").asText() : "";
+                            if ("toggle".equalsIgnoreCase(type)) {
+                                isOn[0] = !isOn[0];
+                            } else if ("set_state".equalsIgnoreCase(type) && node.has("payload")) {
+                                isOn[0] = node.get("payload").get("state").asBoolean();
+                            } else {
+                                continue;
+                            }
+                            System.out.printf("[LIGHT:%s] %s -> is_on=%s%n", deviceId, type, isOn[0]);
+                            ObjectNode ack = MAPPER.createObjectNode();
+                            ack.put("commandId", commandId);
+                            ack.put("status", "ACK");
+                            ack.put("ts", Instant.now().toEpochMilli());
+                            client.publishWith().topic(commandAckTopic).qos(MqttQos.AT_LEAST_ONCE).payload(MAPPER.writeValueAsBytes(ack)).send();
+                        } catch (Exception e) {
+                            System.err.printf("[LIGHT:%s] Erreur parsing: %s%n", deviceId, e.getMessage());
                         }
-                        lastState = state;
-                        System.out.printf("[LIGHT:%s] Commande recue sur %s -> %s%n", deviceId, commandTopic, body);
-                        System.out.printf("[LIGHT:%s] LUMIERE : %s%n", deviceId, "ON".equals(state) ? "ON" : "OFF");
-                    } catch (Exception e) {
-                        System.err.printf("[LIGHT:%s] Erreur parsing: %s%n", deviceId, e.getMessage());
                     }
+                } catch (Exception e) {
+                    System.err.printf("[LIGHT:%s] Subscriber error: %s%n", deviceId, e.getMessage());
                 }
+            }, "light-sub-" + deviceId);
+            subscriber.setDaemon(true);
+            subscriber.start();
+
+            while (!Thread.currentThread().isInterrupted()) {
+                ObjectNode payload = MAPPER.createObjectNode();
+                payload.put("is_on", isOn[0]);
+                payload.put("timestamp", Instant.now().toEpochMilli());
+                client.publishWith().topic(telemetryTopic).qos(MqttQos.AT_LEAST_ONCE).payload(MAPPER.writeValueAsBytes(payload)).send();
+                System.out.printf("[LIGHT:%s] is_on=%s%n", deviceId, isOn[0]);
+                Thread.sleep(intervalMs);
             }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            System.out.printf("[LIGHT:%s] Thread interrompu.%n", deviceId);
         } catch (Exception e) {
             System.err.printf("[LIGHT:%s] Erreur: %s%n", deviceId, e.getMessage());
         } finally {
@@ -463,9 +488,7 @@ public class SmartHomeSimulator {
                     client.publishWith().topic(statusTopic).qos(MqttQos.AT_LEAST_ONCE).payload("OFFLINE".getBytes(StandardCharsets.UTF_8)).send();
                 }
             } catch (Exception ignored) {}
-            try {
-                if (client != null) client.disconnect();
-            } catch (Exception ignored) {}
+            disconnectQuietly(client, "LIGHT:" + deviceId);
         }
     }
 
@@ -513,6 +536,8 @@ public class SmartHomeSimulator {
     private static void runShutterActuator(String host, int port, String username, String password, String userId, String deviceId, int intervalMs) {
         String clientId = "sim-" + userId + "-" + deviceId;
         String commandTopic = String.format("home/%s/device/%s/command", userId, deviceId);
+        String commandAckTopic = String.format("home/%s/device/%s/command/ack", userId, deviceId);
+        String telemetryTopic = String.format("home/%s/device/%s/telemetry", userId, deviceId);
         String statusTopic = String.format("home/%s/device/%s/status", userId, deviceId);
         Mqtt5BlockingClient client = createBlockingClientWithWill(host, port, clientId, username, password, statusTopic, "OFFLINE");
         int currentPosition = 0;
@@ -520,8 +545,6 @@ public class SmartHomeSimulator {
         try {
             client.connect();
             System.out.printf("[SHUTTER:%s] Connecte au broker avec clientId=%s%n", deviceId, clientId);
-
-            // publish ONLINE status
             client.publishWith().topic(statusTopic).qos(MqttQos.AT_LEAST_ONCE).payload("ONLINE".getBytes(StandardCharsets.UTF_8)).send();
 
             client.subscribeWith().topicFilter(commandTopic).qos(MqttQos.AT_LEAST_ONCE).send();
@@ -533,27 +556,49 @@ public class SmartHomeSimulator {
                     if (publish == null || publish.getPayload().isEmpty()) continue;
 
                     String body = StandardCharsets.UTF_8.decode(publish.getPayload().get()).toString();
-                    Integer position = parseShutterPosition(body);
-                    if (position == null) {
-                        System.out.printf("[SHUTTER:%s] Commande non interpretable: %s%n", deviceId, body);
-                        continue;
-                    }
+                    try {
+                        ObjectNode node = (ObjectNode) MAPPER.readTree(body);
+                        String commandId = node.has("commandId") ? node.get("commandId").asText() : UUID.randomUUID().toString();
+                        String type = node.has("type") ? node.get("type").asText() : "";
 
-                    position = Math.max(0, Math.min(position, 100));
-                    System.out.printf("[SHUTTER:%s] Commande recue sur %s -> %s%n", deviceId, commandTopic, body);
-
-                    while (currentPosition != position) {
-                        if (currentPosition < position) {
-                            currentPosition = Math.min(currentPosition + 5, position);
-                        } else {
-                            currentPosition = Math.max(currentPosition - 5, position);
+                        int targetPosition;
+                        switch (type.toLowerCase()) {
+                            case "open"  -> targetPosition = 100;
+                            case "close" -> targetPosition = 0;
+                            case "set_position" -> {
+                                if (!node.has("payload") || !node.get("payload").has("position")) continue;
+                                targetPosition = Math.max(0, Math.min(node.get("payload").get("position").asInt(), 100));
+                            }
+                            default -> { continue; }
                         }
 
-                        System.out.printf("[SHUTTER:%s] Position volet: %d%%%n", deviceId, currentPosition);
-                        Thread.sleep(180);
+                        System.out.printf("[SHUTTER:%s] %s -> cible=%d%%%n", deviceId, type, targetPosition);
+
+                        while (currentPosition != targetPosition) {
+                            if (currentPosition < targetPosition) currentPosition = Math.min(currentPosition + 5, targetPosition);
+                            else currentPosition = Math.max(currentPosition - 5, targetPosition);
+
+                            ObjectNode tel = MAPPER.createObjectNode();
+                            tel.put("position", currentPosition);
+                            tel.put("timestamp", Instant.now().toEpochMilli());
+                            client.publishWith().topic(telemetryTopic).qos(MqttQos.AT_LEAST_ONCE).payload(MAPPER.writeValueAsBytes(tel)).send();
+                            System.out.printf("[SHUTTER:%s] Position: %d%%%n", deviceId, currentPosition);
+                            Thread.sleep(180);
+                        }
+
+                        ObjectNode ack = MAPPER.createObjectNode();
+                        ack.put("commandId", commandId);
+                        ack.put("status", "ACK");
+                        ack.put("ts", Instant.now().toEpochMilli());
+                        client.publishWith().topic(commandAckTopic).qos(MqttQos.AT_LEAST_ONCE).payload(MAPPER.writeValueAsBytes(ack)).send();
+                    } catch (Exception e) {
+                        System.err.printf("[SHUTTER:%s] Erreur parsing: %s%n", deviceId, e.getMessage());
                     }
                 }
             }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            System.out.printf("[SHUTTER:%s] Thread interrompu.%n", deviceId);
         } catch (Exception e) {
             System.err.printf("[SHUTTER:%s] Erreur: %s%n", deviceId, e.getMessage());
         } finally {
@@ -562,9 +607,7 @@ public class SmartHomeSimulator {
                     client.publishWith().topic(statusTopic).qos(MqttQos.AT_LEAST_ONCE).payload("OFFLINE".getBytes(StandardCharsets.UTF_8)).send();
                 }
             } catch (Exception ignored) {}
-            try {
-                if (client != null) client.disconnect();
-            } catch (Exception ignored) {}
+            disconnectQuietly(client, "SHUTTER:" + deviceId);
         }
     }
 
@@ -590,7 +633,6 @@ public class SmartHomeSimulator {
             client.subscribeWith().topicFilter(commandTopic).qos(MqttQos.AT_LEAST_ONCE).send();
             System.out.printf("[PLUG:%s] Abonne au topic %s%n", deviceId, commandTopic);
 
-            // Thread for handling commands
             Thread commandHandler = new Thread(() -> {
                 try (Mqtt5BlockingClient.Mqtt5Publishes publishes = client.publishes(MqttGlobalPublishFilter.SUBSCRIBED)) {
                     while (!Thread.currentThread().isInterrupted()) {
@@ -617,10 +659,8 @@ public class SmartHomeSimulator {
                     System.err.printf("[PLUG:%s] Erreur commandHandler: %s%n", deviceId, e.getMessage());
                 }
             }, "plug-cmd-" + deviceId);
+            commandHandler.setDaemon(true);
             commandHandler.start();
-
-            // Main telemetry loop
-            long lastPublishMs = System.currentTimeMillis();
             while (!Thread.currentThread().isInterrupted()) {
                 // Simulate current draw: 0A when OFF, 0.5-2.0A when ON
                 double currentA = isOn[0] ? ThreadLocalRandom.current().nextDouble(0.5, 2.0) : 0.0;
@@ -681,26 +721,24 @@ public class SmartHomeSimulator {
             double currentPm25 = ThreadLocalRandom.current().nextDouble(10.0, 30.0);
 
             while (!Thread.currentThread().isInterrupted()) {
-                // CO2 simulation: base 400ppm + peak during day (occupancy) + random walk
-                double hourOfDay = (System.currentTimeMillis() % 86400000) / 3600000.0; // 0-24
+                LocalTime nowTime = LocalTime.now(LOCAL_ZONE);
+                double hourOfDay = nowTime.getHour() + nowTime.getMinute() / 60.0;
+
                 double occupancyFactor = Math.sin((hourOfDay - 6) * Math.PI / 12.0); // peak at noon
-                occupancyFactor = Math.max(0.1, occupancyFactor); // never below 0.1
-                
+                occupancyFactor = Math.max(0.1, occupancyFactor);
+
                 double co2Base = 400.0 + (occupancyFactor * 700.0); // 400-1100 ppm
-                double co2Drift = (Math.random() - 0.5) * 100.0; // ±50 ppm random
-                currentCo2 = Math.max(400.0, Math.min(currentCo2 + co2Drift * 0.1, 1500.0));
-                currentCo2 = co2Base * 0.3 + currentCo2 * 0.7; // smooth blend
+                double co2Drift = ThreadLocalRandom.current().nextDouble(-5.0, 5.0);
+                currentCo2 = Math.max(400.0, Math.min(currentCo2 + co2Drift, 1500.0));
+                currentCo2 = co2Base * 0.3 + currentCo2 * 0.7; // smooth blend toward base
 
-                // PM2.5: inversely correlated with time of day (higher at night/pollution)
-                double pm25Drift = (Math.random() - 0.5) * 20.0;
-                currentPm25 = Math.max(5.0, Math.min(currentPm25 + pm25Drift * 0.05, 300.0));
+                double pm25Drift = ThreadLocalRandom.current().nextDouble(-0.5, 0.5);
+                currentPm25 = Math.max(5.0, Math.min(currentPm25 + pm25Drift, 150.0));
 
-                // Air Quality Index (AQI-like): simple mapping
                 int aqi = calculateAQI(currentCo2, currentPm25);
 
-                // Re-use temperature/humidity from lux cycle (ambient conditions)
-                double ambientTemp = 20.0 + 5.0 * Math.sin((hourOfDay - 6) * Math.PI / 12.0);
-                double ambientHumidity = 50.0 + 10.0 * Math.sin((hourOfDay - 6) * Math.PI / 12.0 + 1.0);
+                double ambientTemp = 20.5 + 2.0 * Math.sin((hourOfDay - 6) * Math.PI / 12.0);
+                double ambientHumidity = 50.0 + 8.0 * Math.sin((hourOfDay - 6) * Math.PI / 12.0 + 1.0);
 
                 ObjectNode payload = MAPPER.createObjectNode();
                 payload.put("co2_ppm", Math.round(currentCo2));
@@ -934,6 +972,58 @@ public class SmartHomeSimulator {
                     .password(password.getBytes(StandardCharsets.UTF_8))
                     .applySimpleAuth()
                     .buildBlocking();
+        }
+    }
+
+    private static void runControlSubscriber(String host, int port, String username, String password) {
+        String clientId = "sim-control-" + UUID.randomUUID();
+        Mqtt5BlockingClient client = createBlockingClientWithWill(host, port, clientId, username, password, "home/simulator/control/will", "OFFLINE");
+        try {
+            client.connect();
+            System.out.printf("[CONTROL] Connecte au broker, ecoute sur home/simulator/commands%n");
+            client.subscribeWith().topicFilter("home/simulator/commands").qos(MqttQos.AT_LEAST_ONCE).send();
+
+            try (Mqtt5BlockingClient.Mqtt5Publishes publishes = client.publishes(MqttGlobalPublishFilter.SUBSCRIBED)) {
+                while (!Thread.currentThread().isInterrupted()) {
+                    Mqtt5Publish publish = publishes.receive();
+                    if (publish == null || publish.getPayload().isEmpty()) continue;
+                    String body = StandardCharsets.UTF_8.decode(publish.getPayload().get()).toString();
+                    handleSimulatorCommand(body, host, port, username, password);
+                }
+            }
+        } catch (Exception e) {
+            System.err.printf("[CONTROL] Erreur: %s%n", e.getMessage());
+        } finally {
+            disconnectQuietly(client, "CONTROL");
+        }
+    }
+
+    private static void handleSimulatorCommand(String body, String host, int port, String username, String password) {
+        try {
+            ObjectNode node = (ObjectNode) MAPPER.readTree(body);
+            if (!"start".equalsIgnoreCase(node.path("action").asText())) return;
+
+            String deviceId = node.get("deviceId").asText();
+            String userId   = node.get("userId").asText();
+            String type     = node.get("type").asText();
+            int intervalMs  = node.path("intervalMs").asInt(5000);
+
+            System.out.printf("[CONTROL] Demarrage simulation device=%s type=%s%n", deviceId, type);
+
+            Runnable task = switch (type.toLowerCase()) {
+                case "thermostat"         -> () -> runThermostatDevice(host, port, username, password, userId, deviceId, intervalMs);
+                case "temperature_sensor" -> () -> runTemperatureSensor(host, port, username, password, userId, deviceId, intervalMs);
+                case "lux_sensor"         -> () -> runLuxSensor(host, port, username, password, userId, deviceId, intervalMs);
+                case "light_actuator"     -> () -> runLightActuator(host, port, username, password, userId, deviceId, intervalMs);
+                case "shutter_actuator"   -> () -> runShutterActuator(host, port, username, password, userId, deviceId, intervalMs);
+                case "smart_plug"         -> () -> runSmartPlug(host, port, username, password, userId, deviceId, intervalMs);
+                case "co2_sensor"         -> () -> runCo2Sensor(host, port, username, password, userId, deviceId, intervalMs);
+                case "motion_detector"    -> () -> runMotionDetector(host, port, username, password, userId, deviceId, intervalMs);
+                default -> { System.err.printf("[CONTROL] Type non géré: %s%n", type); yield null; }
+            };
+            if (task != null) new Thread(task, "device-" + deviceId).start();
+        } catch (Exception e) {
+            System.err.printf("[CONTROL] Erreur parsing commande: %s%n", e.getMessage());
         }
     }
 

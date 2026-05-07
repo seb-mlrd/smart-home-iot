@@ -33,7 +33,6 @@ export interface DeviceRequest {
   deviceTypeId: string;
   name: string;
   location: string;
-  mqttClientId: string;
   config?: string;
 }
 

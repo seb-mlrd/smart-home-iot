@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="007-update-device-type-capabilities" author="smarthome">
+        <!-- Remove "unit" from telemetry (it's a field attribute, not a metric) -->
+        <update tableName="device_types">
+            <column name="capabilities" value='{"telemetry":["temperature"],"commands":[]}'/>
+            <where>id = '11111111-0000-0000-0000-000000000005'</where>
+        </update>
+        <update tableName="device_types">
+            <column name="capabilities" value='{"telemetry":["lux"],"commands":[]}'/>
+            <where>id = '11111111-0000-0000-0000-000000000006'</where>
+        </update>
+
+        <!-- Light actuator: add is_on telemetry + toggle command -->
+        <update tableName="device_types">
+            <column name="capabilities" value='{"telemetry":["is_on"],"commands":["toggle","set_state"]}'/>
+            <where>id = '11111111-0000-0000-0000-000000000007'</where>
+        </update>
+
+        <!-- Shutter: add position telemetry + open/close commands -->
+        <update tableName="device_types">
+            <column name="capabilities" value='{"telemetry":["position"],"commands":["open","close","set_position"]}'/>
+            <where>id = '11111111-0000-0000-0000-000000000008'</where>
+        </update>
+    </changeSet>
+
+</databaseChangeLog>

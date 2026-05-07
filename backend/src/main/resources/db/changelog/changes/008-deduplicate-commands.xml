@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="008-deduplicate-commands" author="smarthome">
+        <!-- Prise connectée: set_state redondant avec toggle — on garde toggle uniquement -->
+        <update tableName="device_types">
+            <column name="capabilities" value='{"telemetry":["power_w","voltage_v","current_a","energy_kwh_total","is_on"],"commands":["toggle"]}'/>
+            <where>id = '11111111-0000-0000-0000-000000000003'</where>
+        </update>
+
+        <!-- Actionneur lumière: set_state redondant avec toggle — on garde toggle uniquement -->
+        <update tableName="device_types">
+            <column name="capabilities" value='{"telemetry":["is_on"],"commands":["toggle"]}'/>
+            <where>id = '11111111-0000-0000-0000-000000000007'</where>
+        </update>
+
+        <!-- Volet connecté: open/close sont des alias de set_position(100/0) — on garde set_position uniquement -->
+        <update tableName="device_types">
+            <column name="capabilities" value='{"telemetry":["position"],"commands":["set_position"]}'/>
+            <where>id = '11111111-0000-0000-0000-000000000008'</where>
+        </update>
+    </changeSet>
+
+</databaseChangeLog>

@@ -16,10 +16,13 @@ import com.hivemq.client.mqtt.MqttClient;
 import com.hivemq.client.mqtt.mqtt5.Mqtt5AsyncClient;
 import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5Publish;
 import com.smarthome.backend.command.DeviceCommandAckService;
+import com.smarthome.backend.device.DeviceCreatedEvent;
 import com.smarthome.backend.device.DeviceService;
 import com.smarthome.backend.telemetry.TelemetryService;
 
 import jakarta.annotation.PreDestroy;
+import org.springframework.transaction.event.TransactionalEventListener;
+import org.springframework.transaction.event.TransactionPhase;
 
 @Service
 public class MqttService {
@@ -181,6 +184,17 @@ public class MqttService {
                 && !mqttProperties.username().isBlank()
                 && mqttProperties.password() != null
                 && !mqttProperties.password().isBlank();
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onDeviceCreated(DeviceCreatedEvent event) {
+        if (client == null) return;
+        String payload = String.format(
+                "{\"action\":\"start\",\"deviceId\":\"%s\",\"userId\":\"%s\",\"type\":\"%s\",\"intervalMs\":%d}",
+                event.deviceId(), event.userId(), event.deviceTypeName(), event.intervalMs()
+        );
+        publish("home/simulator/commands", payload)
+                .exceptionally(ex -> { log.error("Failed to notify simulator of new device {}", event.deviceId(), ex); return null; });
     }
 
     @PreDestroy

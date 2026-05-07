@@ -10,7 +10,6 @@ import { MatOption } from '@angular/material/core';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { DeviceService } from '../../../core/services/device.service';
 import { DeviceType } from '../../../core/models/device.model';
-import { HttpErrorResponse } from '@angular/common/http';
 
 @Component({
   selector: 'app-device-add',
@@ -129,6 +128,61 @@ import { HttpErrorResponse } from '@angular/common/http';
       font-family: monospace;
     }
 
+    .cmd-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .cmd-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      background: rgba(34, 197, 94, 0.06);
+      border: 1px solid rgba(34, 197, 94, 0.18);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+
+    .cmd-icon {
+      color: #22c55e;
+      flex-shrink: 0;
+      margin-top: 1px;
+      mat-icon { font-size: 18px; width: 18px; height: 18px; }
+    }
+
+    .cmd-info { flex: 1; min-width: 0; }
+
+    .cmd-name {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #22c55e;
+      font-family: monospace;
+      line-height: 1.3;
+    }
+
+    .cmd-desc {
+      font-size: 0.77rem;
+      color: var(--sh-text-muted);
+      margin-top: 2px;
+      line-height: 1.4;
+    }
+
+    .cmd-param {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      margin-top: 5px;
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+      border-radius: 4px;
+      padding: 1px 7px;
+      font-size: 0.72rem;
+      color: var(--sh-accent);
+
+      mat-icon { font-size: 11px; width: 11px; height: 11px; }
+    }
+
     .no-type-hint {
       color: var(--sh-text-muted);
       font-size: 0.875rem;
@@ -210,17 +264,6 @@ import { HttpErrorResponse } from '@angular/common/http';
             }
           </mat-form-field>
 
-          <div class="section-title">Connexion MQTT</div>
-
-          <mat-form-field appearance="outline">
-            <mat-label>Identifiant MQTT</mat-label>
-            <input matInput formControlName="mqttClientId" placeholder="Ex: sim-thermostat-uuid" />
-            <mat-hint>Identifiant unique du client MQTT (mqtt_client_id du simulateur)</mat-hint>
-            @if (form.get('mqttClientId')?.hasError('required') && form.get('mqttClientId')?.touched) {
-              <mat-error>Identifiant MQTT requis</mat-error>
-            }
-          </mat-form-field>
-
           <div class="actions">
             <a mat-stroked-button routerLink="/devices">Annuler</a>
             <button mat-flat-button class="submit-btn" type="submit" [disabled]="loading()">
@@ -262,9 +305,21 @@ import { HttpErrorResponse } from '@angular/common/http';
             @if (selectedDeviceType()!.capabilities.commands.length) {
               <div class="capability-block">
                 <div class="cap-label">Commandes disponibles</div>
-                <div class="cap-chips">
+                <div class="cmd-list">
                   @for (c of selectedDeviceType()!.capabilities.commands; track c) {
-                    <span class="cmd-chip">{{ c }}</span>
+                    <div class="cmd-row">
+                      <div class="cmd-icon"><mat-icon>{{ commandIcon(c) }}</mat-icon></div>
+                      <div class="cmd-info">
+                        <div class="cmd-name">{{ commandLabel(c) }}</div>
+                        <div class="cmd-desc">{{ commandDescription(c) }}</div>
+                        @if (commandParam(c)) {
+                          <span class="cmd-param">
+                            <mat-icon>input</mat-icon>
+                            {{ commandParam(c) }}
+                          </span>
+                        }
+                      </div>
+                    </div>
                   }
                 </div>
               </div>
@@ -289,7 +344,6 @@ export class DeviceAddComponent implements OnInit {
     deviceTypeId: ['', Validators.required],
     name: ['', [Validators.required, Validators.maxLength(150)]],
     location: ['', Validators.required],
-    mqttClientId: ['', Validators.required],
   });
 
   deviceTypes = signal<DeviceType[]>([]);
@@ -309,6 +363,67 @@ export class DeviceAddComponent implements OnInit {
     });
   }
 
+  commandLabel(command: string): string {
+    switch (command) {
+      case 'turn_on':         return 'Allumer';
+      case 'turn_off':        return 'Éteindre';
+      case 'toggle':          return 'Allumer / Éteindre';
+      case 'set_temperature': return 'Régler la température';
+      case 'set_brightness':  return 'Régler la luminosité';
+      case 'set_position':    return 'Régler la position';
+      case 'set_state':       return 'Changer l\'état';
+      case 'open':            return 'Ouvrir';
+      case 'close':           return 'Fermer';
+      case 'reboot':          return 'Redémarrer';
+      case 'reset':           return 'Réinitialiser';
+      default:                return command;
+    }
+  }
+
+  commandIcon(command: string): string {
+    switch (command) {
+      case 'turn_on':       return 'power_settings_new';
+      case 'turn_off':      return 'power_off';
+      case 'toggle':        return 'swap_horiz';
+      case 'set_temperature': return 'thermostat';
+      case 'set_brightness':  return 'light_mode';
+      case 'set_position':    return 'height';
+      case 'set_state':       return 'tune';
+      case 'open':            return 'lock_open';
+      case 'close':           return 'lock';
+      case 'reboot':          return 'restart_alt';
+      case 'reset':           return 'restore';
+      default:                return 'send';
+    }
+  }
+
+  commandDescription(command: string): string {
+    switch (command) {
+      case 'turn_on':         return 'Met l\'appareil sous tension';
+      case 'turn_off':        return 'Coupe l\'alimentation de l\'appareil';
+      case 'toggle':          return 'Bascule entre allumé et éteint';
+      case 'set_temperature': return 'Définit la consigne de température cible';
+      case 'set_brightness':  return 'Ajuste le niveau de luminosité (0–100 %)';
+      case 'set_position':    return 'Positionne le volet ou l\'actionneur (0–100 %)';
+      case 'set_state':       return 'Allume ou éteint l\'appareil — saisir true ou false';
+      case 'open':            return 'Ouvre le verrou ou le volet';
+      case 'close':           return 'Ferme le verrou ou le volet';
+      case 'reboot':          return 'Redémarre l\'appareil à distance';
+      case 'reset':           return 'Réinitialise l\'appareil aux valeurs par défaut';
+      default:                return 'Envoie la commande à l\'appareil';
+    }
+  }
+
+  commandParam(command: string): string {
+    switch (command) {
+      case 'set_temperature': return 'Valeur numérique (°C)';
+      case 'set_brightness':  return 'Valeur numérique (0–100)';
+      case 'set_position':    return 'Valeur numérique (0–100)';
+      case 'set_state':       return 'Texte : true ou false';
+      default:                return '';
+    }
+  }
+
   submit() {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
@@ -317,21 +432,16 @@ export class DeviceAddComponent implements OnInit {
     this.loading.set(true);
     this.errorMsg.set('');
 
-    const { deviceTypeId, name, location, mqttClientId } = this.form.value;
+    const { deviceTypeId, name, location } = this.form.value;
     this.deviceSvc.create({
       deviceTypeId: deviceTypeId!,
       name: name!,
       location: location!,
-      mqttClientId: mqttClientId!,
     }).subscribe({
       next: (device) => this.router.navigate(['/devices', device.id]),
-      error: (err: HttpErrorResponse) => {
+      error: () => {
         this.loading.set(false);
-        if (err.status === 409) {
-          this.errorMsg.set('Cet identifiant MQTT est déjà utilisé.');
-        } else {
-          this.errorMsg.set('Erreur lors de la création. Réessayez.');
-        }
+        this.errorMsg.set('Erreur lors de la création. Réessayez.');
       },
     });
   }
