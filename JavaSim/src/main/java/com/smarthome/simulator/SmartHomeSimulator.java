@@ -100,14 +100,12 @@ public class SmartHomeSimulator {
 
         System.out.printf("[SYSTEM] Demarrage du simulateur SmartHome sur broker '%s:%d' (user=%s) userId=%s%n", brokerHostRef[0], brokerPortRef[0], brokerUserRef[0], userIdRef[0]);
 
-        // if no devices defined, fallback to a default thermostat for quick testing
-        if (devices.isEmpty()) {
-            Map<String, String> thermo = new HashMap<>();
-            thermo.put("id", "thermo-salon");
-            thermo.put("type", "thermostat");
-            thermo.put("interval_ms", "5000");
-            devices.add(thermo);
-        }
+        // Control subscriber: listens for new devices added from the frontend
+        final String[] hostRef = brokerHostRef;
+        final int[] portRef = brokerPortRef;
+        final String[] userRef = brokerUserRef;
+        final String[] passRef = brokerPasswordRef;
+        new Thread(() -> runControlSubscriber(hostRef[0], portRef[0], userRef[0], passRef[0]), "simulator-control").start();
 
         for (Map<String, String> dev : devices) {
             String id = dev.get("id");
@@ -934,6 +932,58 @@ public class SmartHomeSimulator {
                     .password(password.getBytes(StandardCharsets.UTF_8))
                     .applySimpleAuth()
                     .buildBlocking();
+        }
+    }
+
+    private static void runControlSubscriber(String host, int port, String username, String password) {
+        String clientId = "sim-control-" + UUID.randomUUID();
+        Mqtt5BlockingClient client = createBlockingClientWithWill(host, port, clientId, username, password, "home/simulator/control/will", "OFFLINE");
+        try {
+            client.connect();
+            System.out.printf("[CONTROL] Connecte au broker, ecoute sur home/simulator/commands%n");
+            client.subscribeWith().topicFilter("home/simulator/commands").qos(MqttQos.AT_LEAST_ONCE).send();
+
+            try (Mqtt5BlockingClient.Mqtt5Publishes publishes = client.publishes(MqttGlobalPublishFilter.SUBSCRIBED)) {
+                while (!Thread.currentThread().isInterrupted()) {
+                    Mqtt5Publish publish = publishes.receive();
+                    if (publish == null || publish.getPayload().isEmpty()) continue;
+                    String body = StandardCharsets.UTF_8.decode(publish.getPayload().get()).toString();
+                    handleSimulatorCommand(body, host, port, username, password);
+                }
+            }
+        } catch (Exception e) {
+            System.err.printf("[CONTROL] Erreur: %s%n", e.getMessage());
+        } finally {
+            disconnectQuietly(client, "CONTROL");
+        }
+    }
+
+    private static void handleSimulatorCommand(String body, String host, int port, String username, String password) {
+        try {
+            ObjectNode node = (ObjectNode) MAPPER.readTree(body);
+            if (!"start".equalsIgnoreCase(node.path("action").asText())) return;
+
+            String deviceId = node.get("deviceId").asText();
+            String userId   = node.get("userId").asText();
+            String type     = node.get("type").asText();
+            int intervalMs  = node.path("intervalMs").asInt(5000);
+
+            System.out.printf("[CONTROL] Demarrage simulation device=%s type=%s%n", deviceId, type);
+
+            Runnable task = switch (type.toLowerCase()) {
+                case "thermostat"         -> () -> runThermostatDevice(host, port, username, password, userId, deviceId, intervalMs);
+                case "temperature_sensor" -> () -> runTemperatureSensor(host, port, username, password, userId, deviceId, intervalMs);
+                case "lux_sensor"         -> () -> runLuxSensor(host, port, username, password, userId, deviceId, intervalMs);
+                case "light_actuator"     -> () -> runLightActuator(host, port, username, password, userId, deviceId, intervalMs);
+                case "shutter_actuator"   -> () -> runShutterActuator(host, port, username, password, userId, deviceId, intervalMs);
+                case "smart_plug"         -> () -> runSmartPlug(host, port, username, password, userId, deviceId, intervalMs);
+                case "co2_sensor"         -> () -> runCo2Sensor(host, port, username, password, userId, deviceId, intervalMs);
+                case "motion_detector"    -> () -> runMotionDetector(host, port, username, password, userId, deviceId, intervalMs);
+                default -> { System.err.printf("[CONTROL] Type non géré: %s%n", type); yield null; }
+            };
+            if (task != null) new Thread(task, "device-" + deviceId).start();
+        } catch (Exception e) {
+            System.err.printf("[CONTROL] Erreur parsing commande: %s%n", e.getMessage());
         }
     }
 

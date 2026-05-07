@@ -1,6 +1,6 @@
 import { inject, Injectable, OnDestroy } from '@angular/core';
 import { RxStomp, RxStompConfig } from '@stomp/rx-stomp';
-import { Observable, EMPTY } from 'rxjs';
+import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 import { TelemetryPoint } from '../models/telemetry.model';
@@ -33,7 +33,6 @@ export class WebSocketService implements OnDestroy {
 
   /** Subscribe to live telemetry for a specific device. */
   watchDevice(userId: string, deviceId: string): Observable<TelemetryPoint[]> {
-    if (!this.stomp.active) return EMPTY;
     return this.stomp
       .watch(`/topic/devices/${userId}/${deviceId}/telemetry`)
       .pipe(map(frame => JSON.parse(frame.body) as TelemetryPoint[]));
@@ -41,7 +40,6 @@ export class WebSocketService implements OnDestroy {
 
   /** Subscribe to online/offline status changes for all devices of a user. */
   watchStatus(userId: string): Observable<{ deviceId: string; status: DeviceStatus }> {
-    if (!this.stomp.active) return EMPTY;
     return this.stomp
       .watch(`/topic/devices/${userId}/status`)
       .pipe(map(frame => JSON.parse(frame.body) as { deviceId: string; status: DeviceStatus }));

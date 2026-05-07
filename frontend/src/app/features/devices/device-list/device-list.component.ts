@@ -128,6 +128,14 @@ import { Subscription } from 'rxjs';
       gap: 8px;
     }
 
+    .delete-btn {
+      color: var(--sh-text-muted);
+      min-width: 44px;
+      padding: 0 8px;
+
+      &:hover:not(:disabled) { color: var(--sh-offline); border-color: var(--sh-offline); }
+    }
+
     .empty-state {
       grid-column: 1 / -1;
       text-align: center;
@@ -220,6 +228,12 @@ import { Subscription } from 'rxjs';
                 <mat-icon>visibility</mat-icon>
                 Voir
               </a>
+              <button mat-stroked-button class="delete-btn"
+                      (click)="deleteDevice($event, device)"
+                      [disabled]="deletingId() === device.id"
+                      title="Supprimer">
+                <mat-icon>delete_outline</mat-icon>
+              </button>
             </div>
           </div>
         } @empty {
@@ -247,6 +261,7 @@ export class DeviceListComponent implements OnInit, OnDestroy {
 
   devices = signal<Device[]>([]);
   loading = signal(true);
+  deletingId = signal<string | null>(null);
   searchQuery = '';
   filterStatus = '';
   filterLocation = '';
@@ -290,6 +305,19 @@ export class DeviceListComponent implements OnInit, OnDestroy {
       },
     });
     this.subs.push(sub);
+  }
+
+  deleteDevice(event: MouseEvent, device: Device) {
+    event.stopPropagation();
+    if (!confirm(`Supprimer "${device.name}" ?`)) return;
+    this.deletingId.set(device.id);
+    this.deviceSvc.delete(device.id).subscribe({
+      next: () => {
+        this.devices.update(list => list.filter(d => d.id !== device.id));
+        this.deletingId.set(null);
+      },
+      error: () => this.deletingId.set(null),
+    });
   }
 
   clearFilters() {

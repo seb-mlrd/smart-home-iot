@@ -5,6 +5,7 @@ import com.smarthome.backend.domain.device.*;
 import com.smarthome.backend.domain.user.User;
 import com.smarthome.backend.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,9 +19,22 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class DeviceService {
 
+    // Maps fixed device-type UUIDs (Liquibase 002 + 006) → simulator type keys
+    private static final Map<UUID, String> SIMULATOR_TYPE = Map.of(
+            UUID.fromString("11111111-0000-0000-0000-000000000001"), "thermostat",
+            UUID.fromString("11111111-0000-0000-0000-000000000002"), "co2_sensor",
+            UUID.fromString("11111111-0000-0000-0000-000000000003"), "smart_plug",
+            UUID.fromString("11111111-0000-0000-0000-000000000004"), "motion_detector",
+            UUID.fromString("11111111-0000-0000-0000-000000000005"), "temperature_sensor",
+            UUID.fromString("11111111-0000-0000-0000-000000000006"), "lux_sensor",
+            UUID.fromString("11111111-0000-0000-0000-000000000007"), "light_actuator",
+            UUID.fromString("11111111-0000-0000-0000-000000000008"), "shutter_actuator"
+    );
+
     private final DeviceRepository deviceRepository;
     private final DeviceTypeRepository deviceTypeRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional(readOnly = true)
     public List<DeviceResponse> getAll(UUID userId) {
@@ -42,7 +56,23 @@ public class DeviceService {
                 .config(request.config())
                 .status(DeviceStatus.OFFLINE)
                 .build();
-        return toResponse(deviceRepository.save(device));
+        Device saved = deviceRepository.save(device);
+        saved.setMqttClientId("sim-" + user.getId() + "-" + saved.getId());
+        saved = deviceRepository.save(saved);
+        String simType = SIMULATOR_TYPE.getOrDefault(deviceType.getId(), "unknown");
+        eventPublisher.publishEvent(new DeviceCreatedEvent(
+                saved.getId(), user.getId(), simType, defaultIntervalMs(simType)
+        ));
+        return toResponse(saved);
+    }
+
+    private int defaultIntervalMs(String typeName) {
+        return switch (typeName.toLowerCase()) {
+            case "lux_sensor" -> 3000;
+            case "light_actuator", "shutter_actuator", "motion_detector" -> 2000;
+            case "co2_sensor" -> 10000;
+            default -> 5000;
+        };
     }
 
     @Transactional(readOnly = true)

@@ -1,5 +1,5 @@
 import { Component, inject, signal, computed, OnInit, OnDestroy } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { DatePipe, JsonPipe } from '@angular/common';
 import { MatIcon } from '@angular/material/icon';
 import { MatTab, MatTabGroup } from '@angular/material/tabs';
@@ -153,6 +153,15 @@ import { CommandButtonComponent } from '../../../shared/components/command-butto
 
     .center { display: flex; justify-content: center; padding: 80px; }
     .error-msg { color: var(--sh-offline); text-align: center; padding: 40px; }
+
+    .delete-btn {
+      color: var(--sh-offline);
+      border-color: rgba(239, 68, 68, 0.3);
+      font-size: 0.85rem;
+
+      mat-icon { font-size: 18px; width: 18px; height: 18px; }
+      &:hover:not(:disabled) { background: rgba(239, 68, 68, 0.08); }
+    }
   `],
   template: `
     <a class="back-link" routerLink="/devices">
@@ -181,7 +190,13 @@ import { CommandButtonComponent } from '../../../shared/components/command-butto
             }
           </div>
         </div>
-        <app-device-status-badge [status]="device()!.status" />
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px">
+          <app-device-status-badge [status]="device()!.status" />
+          <button mat-stroked-button class="delete-btn" (click)="deleteDevice()" [disabled]="deleting()">
+            <mat-icon>delete_outline</mat-icon>
+            Supprimer
+          </button>
+        </div>
       </div>
 
       <!-- Métriques -->
@@ -271,6 +286,7 @@ import { CommandButtonComponent } from '../../../shared/components/command-butto
 })
 export class DeviceDetailComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly deviceSvc = inject(DeviceService);
   private readonly telemetrySvc = inject(TelemetryService);
   private readonly wsSvc = inject(WebSocketService);
@@ -280,6 +296,7 @@ export class DeviceDetailComponent implements OnInit, OnDestroy {
   device = signal<Device | null>(null);
   deviceType = signal<DeviceType | null>(null);
   loading = signal(true);
+  deleting = signal(false);
   latestMetrics = signal<TelemetryPoint[]>([]);
   commandHistory = signal<DeviceCommand[]>([]);
 
@@ -326,6 +343,16 @@ export class DeviceDetailComponent implements OnInit, OnDestroy {
   private loadCommandHistory(deviceId: string) {
     this.deviceSvc.getCommands(deviceId).subscribe({
       next: (cmds) => this.commandHistory.set(cmds),
+    });
+  }
+
+  deleteDevice() {
+    const d = this.device();
+    if (!d || !confirm(`Supprimer "${d.name}" ?`)) return;
+    this.deleting.set(true);
+    this.deviceSvc.delete(d.id).subscribe({
+      next: () => this.router.navigate(['/devices']),
+      error: () => this.deleting.set(false),
     });
   }
 

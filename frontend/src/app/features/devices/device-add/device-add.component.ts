@@ -10,7 +10,6 @@ import { MatOption } from '@angular/material/core';
 import { MatProgressSpinner } from '@angular/material/progress-spinner';
 import { DeviceService } from '../../../core/services/device.service';
 import { DeviceType } from '../../../core/models/device.model';
-import { HttpErrorResponse } from '@angular/common/http';
 
 @Component({
   selector: 'app-device-add',
@@ -210,17 +209,6 @@ import { HttpErrorResponse } from '@angular/common/http';
             }
           </mat-form-field>
 
-          <div class="section-title">Connexion MQTT</div>
-
-          <mat-form-field appearance="outline">
-            <mat-label>Identifiant MQTT</mat-label>
-            <input matInput formControlName="mqttClientId" placeholder="Ex: sim-thermostat-uuid" />
-            <mat-hint>Identifiant unique du client MQTT (mqtt_client_id du simulateur)</mat-hint>
-            @if (form.get('mqttClientId')?.hasError('required') && form.get('mqttClientId')?.touched) {
-              <mat-error>Identifiant MQTT requis</mat-error>
-            }
-          </mat-form-field>
-
           <div class="actions">
             <a mat-stroked-button routerLink="/devices">Annuler</a>
             <button mat-flat-button class="submit-btn" type="submit" [disabled]="loading()">
@@ -289,7 +277,6 @@ export class DeviceAddComponent implements OnInit {
     deviceTypeId: ['', Validators.required],
     name: ['', [Validators.required, Validators.maxLength(150)]],
     location: ['', Validators.required],
-    mqttClientId: ['', Validators.required],
   });
 
   deviceTypes = signal<DeviceType[]>([]);
@@ -317,21 +304,16 @@ export class DeviceAddComponent implements OnInit {
     this.loading.set(true);
     this.errorMsg.set('');
 
-    const { deviceTypeId, name, location, mqttClientId } = this.form.value;
+    const { deviceTypeId, name, location } = this.form.value;
     this.deviceSvc.create({
       deviceTypeId: deviceTypeId!,
       name: name!,
       location: location!,
-      mqttClientId: mqttClientId!,
     }).subscribe({
       next: (device) => this.router.navigate(['/devices', device.id]),
-      error: (err: HttpErrorResponse) => {
+      error: () => {
         this.loading.set(false);
-        if (err.status === 409) {
-          this.errorMsg.set('Cet identifiant MQTT est déjà utilisé.');
-        } else {
-          this.errorMsg.set('Erreur lors de la création. Réessayez.');
-        }
+        this.errorMsg.set('Erreur lors de la création. Réessayez.');
       },
     });
   }
